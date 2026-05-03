@@ -16,6 +16,7 @@ export declare const USER_APPS_DATA: Map<string, Record<string, unknown>>;
  * Called from the Kotlin side via JSEngine / loaderCtx.invoke.
  */
 export declare function setAppData(id: string, key: string, value: unknown): void;
+export declare function getAppData(id: string, key: string): unknown;
 export declare function registerComponent(path: string, component: unknown): void;
 export declare function getRegisteredComponent(path: string): unknown | undefined;
 export declare function removeUserApp(id: string): void;

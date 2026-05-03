@@ -1,6 +1,7 @@
 ﻿package li.kelp.vuetale.app
 
 import com.caoccao.javet.values.V8Value
+import com.caoccao.javet.values.reference.V8ValueObject
 import li.kelp.vuetale.events.EventRegistry
 import li.kelp.vuetale.javascript.JSEngine
 import li.kelp.vuetale.tree.Element
@@ -158,7 +159,8 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
                     if (value != null && isJvmFunction(value)) {
                         val hostId = JSEngine.instance.bridge.registerHostCallback(getId(), value)
                         engine.runOnV8Thread {
-                            engine.loaderCtx.invoke<V8Value>("setAppData", getId(), key, mapOf("_vtHostFnId" to hostId)).close()
+                            engine.loaderCtx.invoke<V8Value>("setAppData", getId(), key, mapOf("_vtHostFnId" to hostId))
+                                .close()
                         }
                     } else {
                         engine.runOnV8Thread {
@@ -230,6 +232,22 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
         } catch (e: Exception) {
             // Swallow exceptions caused by engine shutdown; data remains in cache.
             logger.warning("setData failed for app '${getId()}' key='$key': ${e.message}")
+        }
+    }
+
+    fun getData(key: String): V8Value? {
+        val engine = getEngine()
+        if (!engine.isAlive) {
+            logger.fine("Skipping getData('$key') because JSEngine is not alive")
+            return null
+        }
+        return try {
+            engine.runOnV8Thread {
+                engine.loaderCtx.invoke<V8Value>("getAppData", getId(), key)
+            }
+        } catch (e: Exception) {
+            logger.warning("getData failed for app '${getId()}' key='$key': ${e.message}")
+            null
         }
     }
 

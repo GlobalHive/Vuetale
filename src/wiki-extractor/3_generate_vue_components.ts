@@ -1015,6 +1015,96 @@ function valueNodeToTsType(
   }
 }
 
+function tryMatchObjectType(
+  node: ValueNode,
+  uiTypes: Record<string, Record<string, string> | string[]>,
+): string | null {
+  if (node.kind !== "type" || node.typeName) return null;
+  
+  // Get field names from the object
+  const nodeFields = new Set(
+    node.items
+      .filter((it): it is Extract<TypeItem, { kind: "field" }> => it.kind === "field")
+      .map(it => it.name)
+  );
+  
+  if (nodeFields.size === 0) return null;
+  
+  // Try to match against known types
+  let bestMatch: { typeName: string; nodeScore: number; typeFieldCount: number } | null = null;
+  
+  for (const [typeName, typeDef] of Object.entries(uiTypes)) {
+    if (Array.isArray(typeDef)) continue;
+    
+    const typeFields = new Set(Object.keys(typeDef));
+    if (typeFields.size === 0) continue;
+    
+    // Count how many of the node's fields exist in the type
+    const matchingFields = Array.from(nodeFields).filter(f => typeFields.has(f)).length;
+    
+    // Calculate node score (what percentage of node fields are in the type)
+    const nodeScore = matchingFields / nodeFields.size;
+    
+    // Require at least 80% of node fields to match
+    if (nodeScore >= 0.8) {
+      // If all node fields match, prefer the type with more fields (more specific)
+      // Otherwise, prefer higher node score
+      if (!bestMatch ||
+          nodeScore > bestMatch.nodeScore ||
+          (nodeScore === bestMatch.nodeScore && nodeScore === 1.0 && typeFields.size > bestMatch.typeFieldCount)) {
+        bestMatch = { typeName, nodeScore, typeFieldCount: typeFields.size };
+      }
+    }
+  }
+  
+  return bestMatch?.typeName ?? null;
+}
+
+function valueNodeToNamedType(
+  node: ValueNode,
+  uiTypes: Record<string, Record<string, string> | string[]>,
+  varTypeMap?: Map<string, string>,
+): string {
+  switch (node.kind) {
+    case "boolean": return "boolean";
+    case "number": return "number";
+    case "string": return "string";
+    case "color": return "string";
+    case "identifier": return "string";
+    case "translation": return "string";
+    case "variable": {
+      // Try to look up the type from the var type map
+      if (varTypeMap?.has(node.name)) {
+        return varTypeMap.get(node.name)!;
+      }
+      return "unknown";
+    }
+    case "type": {
+      // For Vars, prefer the named type if it exists
+      if (node.typeName && uiTypes[node.typeName]) {
+        return node.typeName;
+      }
+      
+      // Try to match against known types by structure
+      const matchedType = tryMatchObjectType(node, uiTypes);
+      if (matchedType) {
+        return matchedType;
+      }
+      
+      // Fall back to inline type
+      const fields = node.items
+        .filter((it): it is Extract<TypeItem, { kind: "field" }> => it.kind === "field")
+        .map((it) => `${it.name}?: ${valueNodeToNamedType(it.value, uiTypes, varTypeMap)}`)
+        .join("; ");
+      return `{ ${fields} }`;
+    }
+    case "array": return "unknown[]";
+    case "propRef": return "unknown";
+    case "refMember": return "unknown"; // Cross-file reference - type unknown for now
+    default: return "unknown";
+  }
+}
+
 function valueNodeToLiteral(node: ValueNode): string {
   switch (node.kind) {
     case "string": return JSON.stringify(node.value);
@@ -1061,34 +1151,175 @@ function valueNodeToLiteral(node: ValueNode): string {
   throw new Error(`Unsupported value node kind: ${String((node as { kind?: string }).kind)}`);
 }
 
-export async function generateVueRenderComponents(options?: {
-  inputPath?: string;
-  outputDir?: string;
-  uiTypesPath?: string;
-}): Promise<void> {
-  const inputPath = (options?.inputPath ?? "./input/Common.ui").replace(/\\/g, "/");
-  const outputDir = (options?.outputDir ?? "./output/components").replace(/\\/g, "/");
-  const uiTypesPath = (options?.uiTypesPath ?? "./output/hytale-ui-types.json").replace(/\\/g, "/");
+function collectVarReferences(node: ValueNode, refs: Set<string>): void {
+  switch (node.kind) {
+    case "variable":
+      refs.add(node.name);
+      break;
+    case "refMember":
+      // Cross-file references - skip for now
+      break;
+    case "type":
+      for (const item of node.items) {
+        if (item.kind === "field") {
+          collectVarReferences(item.value, refs);
+        } else if (item.kind === "spread") {
+          collectVarReferences(item.value, refs);
+        }
+      }
+      break;
+    case "array":
+      for (const item of node.items) {
+        collectVarReferences(item, refs);
+      }
+      break;
+    case "math":
+      collectVarReferences(node.left, refs);
+      collectVarReferences(node.right, refs);
+      break;
+    case "unary":
+      collectVarReferences(node.value, refs);
+      break;
+  }
+}
 
+function valueNodeToGetterExpr(node: ValueNode, varPrefix: string, fileImports?: Set<string>, isTopLevel = true): string {
+  switch (node.kind) {
+    case "string":
+      return JSON.stringify(node.value);
+    case "number":
+      return String(node.value);
+    case "boolean":
+      return String(node.value);
+    case "color":
+      return JSON.stringify(node.value);
+    case "identifier":
+      return JSON.stringify(node.value);
+    case "translation":
+      return JSON.stringify(node.value);
+    case "variable":
+      return `${varPrefix}.${node.name}()`;
+    case "propRef":
+      return "undefined";
+    case "refMember":
+      // Cross-file reference: $Sounds.@ButtonsCancel => Sounds.ButtonsCancel()
+      if (fileImports) {
+        fileImports.add(node.ref);
+      }
+      return `${node.ref}.Vars.${node.name}()`;
+    case "unary": {
+      const v = valueNodeToGetterExpr(node.value, varPrefix, fileImports, false);
+      return `-(${v})`;
+    }
+    case "math": {
+      const l = valueNodeToGetterExpr(node.left, varPrefix, fileImports, false);
+      const r = valueNodeToGetterExpr(node.right, varPrefix, fileImports, false);
+      return `(${l} ${node.op} ${r})`;
+    }
+    case "type": {
+      const fields: string[] = [];
+      for (const item of node.items) {
+        if (item.kind === "field") {
+          fields.push(`${JSON.stringify(item.name)}: ${valueNodeToGetterExpr(item.value, varPrefix, fileImports, false)}`);
+        } else if (item.kind === "spread") {
+          const spreadExpr = valueNodeToGetterExpr(item.value, varPrefix, fileImports, false);
+          fields.push(`...${spreadExpr}`);
+        }
+      }
+      const objLiteral = `{ ${fields.join(", ")} }`;
+      // Only wrap in parentheses if this is a top-level return value
+      return isTopLevel ? `(${objLiteral})` : objLiteral;
+    }
+    case "array":
+      return `[${node.items.map(item => valueNodeToGetterExpr(item, varPrefix, fileImports, false)).join(", ")}]`;
+  }
+
+  return "undefined";
+}
+
+async function generateFileComponents(
+  inputPath: string,
+  outputDir: string,
+  uiTypes: Record<string, Record<string, string> | string[]>,
+): Promise<void> {
   const source = await Deno.readTextFile(inputPath);
   const defs = parseTopLevelDefinitions(source);
   const graph = new DefinitionGraph(inputPath);
   await graph.loadFile(inputPath);
 
-  let uiTypes: Record<string, Record<string, string> | string[]> = {};
-  try {
-    const uiTypesJson = JSON.parse(await Deno.readTextFile(uiTypesPath));
-    uiTypes = uiTypesJson.types ?? {};
-  } catch {
-    // uiTypes unavailable; prop types will fall back to unknown
-  }
-
-  await Deno.mkdir(outputDir, { recursive: true });
   const componentNames: string[] = [];
   const componentModules: string[] = [];
   let needsPropTypeImport = false;
 
+  // Separate top-level variables from component definitions
+  const topLevelVars: Array<{ name: string; expression: string }> = [];
+  const componentDefs: Array<{ name: string; expression: string }> = [];
+
   for (const def of defs) {
+    const elementType = def.expression.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*\{/s);
+    if (elementType) {
+      componentDefs.push(def);
+    } else {
+      topLevelVars.push(def);
+    }
+  }
+
+  // Generate Vars object with getters for all top-level variables
+  // Build type map with multiple passes to resolve variable references
+  const varTypeMap = new Map<string, string>();
+  let maxIterations = 10;
+  
+  while (maxIterations-- > 0) {
+    const sizeBefore = varTypeMap.size;
+    for (const varDef of topLevelVars) {
+      if (varTypeMap.has(varDef.name)) continue;
+      try {
+        const parsed = new ValueParser(varDef.expression).parseValue();
+        const tsType = valueNodeToNamedType(parsed, uiTypes, varTypeMap);
+        if (tsType !== "unknown" || parsed.kind !== "variable") {
+          varTypeMap.set(varDef.name, tsType);
+        }
+      } catch (error) {
+        // Skip for now, will be marked as unknown later
+      }
+    }
+    // Stop if no progress was made
+    if (varTypeMap.size === sizeBefore) break;
+  }
+  
+  // Track cross-file imports
+  const fileImports = new Set<string>();
+  
+  // Track which named types are used for import statement
+  const usedTypes = new Set<string>();
+  
+  // Generate getters with proper types
+  const varsGetters: string[] = [];
+  for (const varDef of topLevelVars) {
+    try {
+      const parsed = new ValueParser(varDef.expression).parseValue();
+      const getterExpr = valueNodeToGetterExpr(parsed, "Vars", fileImports);
+      
+      // Use the type from the map, or unknown if not resolved
+      const tsType = varTypeMap.get(varDef.name) ?? "unknown";
+      
+      // Track named types (not inline object types or primitives)
+      if (tsType !== "unknown" && !tsType.includes("{") && !["string", "number", "boolean", "unknown[]"].includes(tsType)) {
+        usedTypes.add(tsType);
+      }
+      
+      varsGetters.push(`  ${varDef.name}: (): ${tsType} => ${getterExpr}`);
+    } catch (error) {
+      console.warn(`Failed to generate getter for @${varDef.name}:`, error);
+      varsGetters.push(`  ${varDef.name}: (): unknown => undefined`);
+    }
+  }
+
+  const varsObjectCode = varsGetters.length > 0
+    ? `export const Vars = {\n${varsGetters.join(",\n")}\n};\n\n`
+    : "";
+
+  for (const def of componentDefs) {
     const elementType = def.expression.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*\{/s);
     if (!elementType) {
       continue;
@@ -1108,11 +1339,13 @@ export async function generateVueRenderComponents(options?: {
     const localVarPropDefs = new Map<string, PropDefinition>();
     for (const lv of localVarNodes) {
       const resolvedDefault = await graph.resolveNode(lv.value, defaultCtx);
+      // Use the original parsed value to preserve Vars references
+      const defaultExpr = valueNodeToGetterExpr(lv.value, "Vars", fileImports);
       localVarPropDefs.set(lv.name, {
         varName: lv.name,
         propName: toLowerCamelCase(lv.name),
         tsType: valueNodeToTsType(resolvedDefault, uiTypes),
-        defaultExpr: valueNodeToLiteral(resolvedDefault),
+        defaultExpr: defaultExpr,
       });
     }
 
@@ -1131,12 +1364,19 @@ export async function generateVueRenderComponents(options?: {
       if (pd) {
         const { tsType, defaultExpr } = pd;
         customPropTypeFields.push(`  ${propName}?: ${tsType};`);
-        if (tsType === "boolean") {
-          propDeclParts.push(`    ${propName}: {\n      type: Boolean,\n      default: ${defaultExpr},\n    }`);
+        
+        // Check if defaultExpr is a simple Vars reference (e.g., "Vars.ButtonBorder()")
+        const simpleVarsMatch = defaultExpr.match(/^Vars\.([A-Za-z0-9_]+)\(\)$/);
+        
+        if (simpleVarsMatch && (tsType === "boolean" || tsType === "number" || tsType === "string")) {
+          // For simple Vars references with primitive types, use function reference
+          propDeclParts.push(`    ${propName}: {\n      type: ${tsType === "boolean" ? "Boolean" : tsType === "number" ? "Number" : "String"},\n      default: Vars.${simpleVarsMatch[1]},\n    }`);
+        } else if (tsType === "boolean") {
+          propDeclParts.push(`    ${propName}: {\n      type: Boolean,\n      default: () => ${defaultExpr},\n    }`);
         } else if (tsType === "number") {
-          propDeclParts.push(`    ${propName}: {\n      type: Number,\n      default: ${defaultExpr},\n    }`);
+          propDeclParts.push(`    ${propName}: {\n      type: Number,\n      default: () => ${defaultExpr},\n    }`);
         } else if (tsType === "string") {
-          propDeclParts.push(`    ${propName}: {\n      type: String,\n      default: ${defaultExpr},\n    }`);
+          propDeclParts.push(`    ${propName}: {\n      type: String,\n      default: () => ${defaultExpr},\n    }`);
         } else {
           needsPropType = true;
           propDeclParts.push(`    ${propName}: {\n      type: Object as PropType<${tsType}>,\n      default: () => (${defaultExpr}),\n    }`);
@@ -1191,8 +1431,57 @@ const ${componentName} = defineComponent({
     componentModules.push(componentCode);
   }
 
-  const commonEntries = componentNames.join(",\n  ");
-  const moduleCode = `/* eslint-disable vue/no-reserved-component-names */\n/* eslint-disable @typescript-eslint/no-empty-object-type */\n/* eslint-disable @typescript-eslint/no-unused-vars */\n/* eslint-disable vue/multi-word-component-names */\nimport type { NATIVE } from "@/types/global";\nimport { defineComponent, h, resolveComponent, type PropType } from "vue";\nimport type { DefineComponent, PublicProps, SlotsType, VNode } from "vue";\n\ntype C<P, S extends Record<string, (...args: any[]) => VNode[]> = Record<never, never>> = DefineComponent<P, {}, {}, {}, {}, {}, {}, {}, string, PublicProps, Readonly<P>, {}, SlotsType<S>>;\n\n${componentModules.join("\n")}\nexport const Common = {\n  ${commonEntries}\n};\n`;
+  // Generate import statements for cross-file references
+  const crossFileImports = Array.from(fileImports).sort()
+    .map(ref => `import * as ${ref} from "./${ref}.ts";`)
+    .join("\n");
+  const importSection = crossFileImports ? `${crossFileImports}\n\n` : "";
+  
+  // Generate type imports for named types used in Vars
+  const typeImports = usedTypes.size > 0
+    ? `import type { ${Array.from(usedTypes).sort().join(", ")} } from "vuetale/types/elements";\n`
+    : "";
 
-  await Deno.writeTextFile(`${outputDir}/Common.ts`, moduleCode);
+  // Extract filename from inputPath (e.g., "Common" from "./input/Common.ui")
+  const filename = inputPath.split("/").pop()?.replace(/\.ui$/, "") ?? "output";
+  const exportName = filename;
+  
+  const commonEntries = componentNames.join(",\n  ");
+  const moduleCode = `/* eslint-disable vue/no-reserved-component-names */\n/* eslint-disable @typescript-eslint/no-empty-object-type */\n/* eslint-disable @typescript-eslint/no-unused-vars */\n/* eslint-disable vue/multi-word-component-names */\n/* eslint-disable @typescript-eslint/no-explicit-any */\n${typeImports}import type { NATIVE } from "vuetale/types/elements";\nimport { defineComponent, h, resolveComponent, type PropType } from "vue";\nimport type { DefineComponent, PublicProps, SlotsType, VNode } from "vue";\n${importSection}type C<P, S extends Record<string, (...args: any[]) => VNode[]> = Record<never, never>> = DefineComponent<P, {}, {}, {}, {}, {}, {}, {}, string, PublicProps, Readonly<P>, {}, SlotsType<S>>;\n\n${varsObjectCode}${componentModules.join("\n")}${componentNames.length > 0 ? `\nexport const ${exportName} = {\n  ${commonEntries}\n};\n` : ""}`;
+
+  await Deno.writeTextFile(`${outputDir}/${filename}.ts`, moduleCode);
+}
+
+export async function generateVueRenderComponents(options?: {
+  inputDir?: string;
+  outputDir?: string;
+  uiTypesPath?: string;
+}): Promise<void> {
+  const inputDir = (options?.inputDir ?? "./input").replace(/\\/g, "/");
+  const outputDir = (options?.outputDir ?? "./output/components").replace(/\\/g, "/");
+  const uiTypesPath = (options?.uiTypesPath ?? "./output/hytale-ui-types.json").replace(/\\/g, "/");
+
+  let uiTypes: Record<string, Record<string, string> | string[]> = {};
+  try {
+    const uiTypesJson = JSON.parse(await Deno.readTextFile(uiTypesPath));
+    uiTypes = uiTypesJson.types ?? {};
+  } catch {
+    // uiTypes unavailable; prop types will fall back to unknown
+  }
+
+  await Deno.mkdir(outputDir, { recursive: true });
+
+  // Find all .ui files in the input directory
+  const uiFiles: string[] = [];
+  for await (const entry of Deno.readDir(inputDir)) {
+    if (entry.isFile && entry.name.endsWith(".ui")) {
+      uiFiles.push(`${inputDir}/${entry.name}`);
+    }
+  }
+
+  // Generate components for each .ui file
+  for (const uiFile of uiFiles) {
+    console.log(`Generating components for ${uiFile}...`);
+    await generateFileComponents(uiFile, outputDir, uiTypes);
+  }
 }

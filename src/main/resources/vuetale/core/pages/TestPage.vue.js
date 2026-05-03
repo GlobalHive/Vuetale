@@ -1,43 +1,43 @@
-import { defineComponent as L, ref as s, onBeforeUnmount as M, openBlock as v, createElementBlock as h, createVNode as l, unref as t, withCtx as T, createElementVNode as u, toDisplayString as a, createBlock as b, createCommentVNode as G, Fragment as w, renderList as D } from "vue";
+import { defineComponent as b, ref as s, onBeforeUnmount as G, openBlock as v, createElementBlock as d, createVNode as l, unref as t, withCtx as T, createElementVNode as u, toDisplayString as a, createBlock as I, createCommentVNode as D, Fragment as R, renderList as S } from "vue";
 import { Common as r } from "../components/Common.js";
-import { Core as E } from "../components/core/index.js";
+import { Core as x } from "../components/core/index.js";
 import { useData as i } from "../composables/useData.js";
-const S = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
+const N = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
   "layout-mode": "Top",
   "flex-weight": 1,
   anchor: { Full: 1 },
   background: { Color: "#444444" }
-}, K = { "layout-mode": "TopScrolling" }, m = /* @__PURE__ */ L({
+}, w = { "layout-mode": "TopScrolling" }, j = /* @__PURE__ */ b({
   __name: "TestPage",
-  setup(x) {
+  setup(K) {
     console.log("WORKS!");
-    const I = i("testFn", () => {
-    }), V = i("testFn2", (e, n) => {
+    const C = i("testFn", () => {
+    }), E = i("testFn2", (e, n) => {
     });
-    function C() {
-      console.log("CLICKED ME"), _.value = !_.value, I.value(), console.log("Return of testFn2: ", V.value(123, "hello"));
+    function F() {
+      console.log("CLICKED ME"), m.value = !m.value, C.value(), console.log("Return of testFn2: ", E.value(123, "hello"));
     }
-    const _ = s(!1), d = s("nothing yet"), U = i("test"), F = i("test2"), H = i("counter"), o = s([]);
-    function R() {
+    const m = s(!1), p = s("nothing yet"), _ = i("test"), V = i("test2"), y = i("counter"), o = s([]);
+    function A() {
       o.value.push({ name: `Entry ${o.value.length + 1}`, toggle: !1 });
     }
-    function y(e) {
+    function B(e) {
       o.value.splice(e, 1);
     }
-    function A(e) {
+    function k(e) {
       if (e > 0) {
         const n = o.value[e];
         o.value[e] = o.value[e - 1], o.value[e - 1] = n;
       }
     }
-    const g = s(0), f = s(0), B = setInterval(() => {
-      g.value++;
-    }, 1e3), N = setInterval(() => {
+    const h = s(0), f = s(0), H = setInterval(() => {
+      h.value++;
+    }, 1e3), L = setInterval(() => {
       f.value++;
     }, 1500);
-    return M(() => {
-      clearInterval(B), clearInterval(N);
-    }), (e, n) => (v(), h("Group", S, [
+    return G(() => {
+      clearInterval(H), clearInterval(L);
+    }), (e, n) => (v(), d("Group", N, [
       l(t(r).Container, {
         anchor: { Height: 800, Width: 600 },
         "close-button": !0
@@ -45,51 +45,51 @@ const S = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
         title: T(() => [
           l(t(r).Title, {
             class: "",
-            text: _.value ? "Title example" : "Anotherx title"
+            text: m.value ? "Title example" : "Anotherx title"
           }, null, 8, ["text"])
         ]),
         content: T(() => [
           u("Group", W, [
             u("Group", null, [
-              u("Label", null, a(d.value) + " | " + a(t(U)) + " " + a(t(F)?.a) + " " + a(t(H)) + " | Counter1: " + a(g.value) + " | Counter2: " + a(f.value), 1)
+              u("Label", null, a(p.value) + " | " + a(t(_)) + " " + a(t(V)?.a) + " " + a(t(y)) + " | Counter1: " + a(h.value) + " | Counter2: " + a(f.value), 1)
             ]),
             n[1] || (n[1] = u("TextField", null, null, -1)),
             l(t(r).TextButton, {
               text: "Example test",
-              onActivating: C,
+              onActivating: F,
               anchor: { Height: 20, Top: 80 }
             }),
-            _.value ? (v(), b(t(E).TextField, {
+            m.value ? (v(), I(t(x).TextField, {
               key: 0,
               decoration: { Default: {} },
-              modelValue: d.value,
-              "onUpdate:modelValue": n[0] || (n[0] = (c) => d.value = c),
+              modelValue: p.value,
+              "onUpdate:modelValue": n[0] || (n[0] = (c) => p.value = c),
               anchor: { Height: 120, Top: 10, Width: 200 }
-            }, null, 8, ["modelValue"])) : G("", !0),
-            u("Group", K, [
-              (v(!0), h(w, null, D(o.value, (c, p) => (v(), h("Group", {
-                key: p,
+            }, null, 8, ["modelValue"])) : D("", !0),
+            u("Group", w, [
+              (v(!0), d(R, null, S(o.value, (c, g) => (v(), d("Group", {
+                key: g,
                 anchor: { Height: 200 }
               }, [
                 u("Label", null, a(c.name), 1),
-                l(t(E).TextField, {
+                l(t(x).TextField, {
                   modelValue: c.name,
-                  "onUpdate:modelValue": (k) => c.name = k
+                  "onUpdate:modelValue": (U) => c.name = U
                 }, null, 8, ["modelValue", "onUpdate:modelValue"]),
                 l(t(r).TextButton, {
                   text: "Remove",
-                  onActivating: () => y(p),
+                  onActivating: () => B(g),
                   anchor: { Height: 20, Top: 5, Left: 100 }
                 }, null, 8, ["onActivating"]),
                 l(t(r).TextButton, {
                   text: "Up",
-                  onActivating: () => A(p),
+                  onActivating: () => k(g),
                   anchor: { Height: 20, Top: 5, Left: 160 }
                 }, null, 8, ["onActivating"])
               ]))), 128)),
               l(t(r).TextButton, {
                 text: "Add Entry",
-                onActivating: R,
+                onActivating: A,
                 anchor: { Height: 20, Top: 10 }
               })
             ])
@@ -100,9 +100,7 @@ const S = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
     ]));
   }
 });
-m.__hmrId = "265dd60d";
-typeof __VUE_HMR_RUNTIME__ < "u" && (__VUE_HMR_RUNTIME__.createRecord(m.__hmrId, m) || __VUE_HMR_RUNTIME__.reload(m.__hmrId, m));
 export {
-  m as default
+  j as default
 };
-//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiVGVzdFBhZ2UudnVlLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7In0=
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiVGVzdFBhZ2UudnVlLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OyJ9

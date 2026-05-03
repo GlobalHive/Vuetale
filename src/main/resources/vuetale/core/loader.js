@@ -1,5 +1,5 @@
-import { shallowReactive as f, ref as m } from "vue";
-import { hytaleRenderer as A } from "./renderer.js";
+import { shallowReactive as f, ref as A } from "vue";
+import { hytaleRenderer as m } from "./renderer.js";
 import R from "./components/App.vue.js";
 /* empty css                    */
 import { flushPendingStyles as v, applyStyles as P } from "./styles.js";
@@ -7,13 +7,13 @@ function b(e, t) {
   globalThis[e] = t;
 }
 const p = /* @__PURE__ */ new Map(), s = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Map(), u = /* @__PURE__ */ new Map(), r = /* @__PURE__ */ new Map();
-function h(e, t, o) {
-  let n = r.get(e);
-  n || (n = f({}), r.set(e, n));
-  let c = o;
+function h(e, t, n) {
+  let o = r.get(e);
+  o || (o = f({}), r.set(e, o));
+  let c = n;
   try {
-    if (o && typeof o == "object" && "_vtHostFnId" in o) {
-      const a = o._vtHostFnId;
+    if (n && typeof n == "object" && "_vtHostFnId" in n) {
+      const a = n._vtHostFnId;
       c = function(..._) {
         try {
           return ktBridge.invokeHostCallback(a, ..._);
@@ -25,7 +25,12 @@ function h(e, t, o) {
   } catch (a) {
     console.error("setAppData: failed to convert host callback marker", a);
   }
-  n[t] = c;
+  o[t] = c;
+}
+function D(e, t) {
+  const n = r.get(e);
+  if (n)
+    return n[t];
 }
 const g = /* @__PURE__ */ new Map();
 function w(e, t) {
@@ -40,37 +45,37 @@ function U(e) {
 }
 function E(e, t) {
   console.log("Creating user app", e, t ?? "(no component)"), v(), r.has(e) || r.set(e, f({}));
-  const o = m(t);
-  u.set(e, o);
-  const n = A(e).createApp(R);
-  return n.provide("appId", e), n.provide("componentPathRef", o), p.set(e, n), n;
+  const n = A(t);
+  u.set(e, n);
+  const o = m(e).createApp(R);
+  return o.provide("appId", e), o.provide("componentPathRef", n), p.set(e, o), o;
 }
 function M(e, t) {
-  const o = u.get(e);
-  o ? (o.value = t, console.log("navigateTo", e, t)) : console.warn("navigateTo: no app found with id", e);
+  const n = u.get(e);
+  n ? (n.value = t, console.log("navigateTo", e, t)) : console.warn("navigateTo: no app found with id", e);
 }
 function T(e) {
   return p.get(e);
 }
-function y(e) {
+function d(e) {
   return s.get(e);
 }
 function N(e) {
   return i.get(e);
 }
-function C(e, t) {
-  const o = {
+function y(e, t) {
+  const n = {
     _vtContainerId: e,
     getRoot: () => t.root
   };
-  Object.defineProperty(o, "_vnode", { value: null, writable: !0, enumerable: !1, configurable: !0 }), Object.defineProperty(o, "__vue_app__", { value: null, writable: !0, enumerable: !1, configurable: !0 }), s.set(e, o);
+  Object.defineProperty(n, "_vnode", { value: null, writable: !0, enumerable: !1, configurable: !0 }), Object.defineProperty(n, "__vue_app__", { value: null, writable: !0, enumerable: !1, configurable: !0 }), s.set(e, n);
 }
 b("_vt", {
   applyStyles: P,
   createUserApp: E,
   getUserApp: T,
-  getUserAppRef: y,
-  registerUserAppRef: C,
+  getUserAppRef: d,
+  registerUserAppRef: y,
   removeUserApp: U,
   navigateTo: M,
   registerComponent: w,
@@ -85,14 +90,15 @@ export {
   i as USER_APPS_META,
   s as USER_APPS_REF,
   E as createUserApp,
+  D as getAppData,
   S as getRegisteredComponent,
   T as getUserApp,
   N as getUserAppMeta,
-  y as getUserAppRef,
+  d as getUserAppRef,
   M as navigateTo,
   w as registerComponent,
-  C as registerUserAppRef,
+  y as registerUserAppRef,
   U as removeUserApp,
   h as setAppData
 };
-//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoibG9hZGVyLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OyJ9
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoibG9hZGVyLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7In0=
