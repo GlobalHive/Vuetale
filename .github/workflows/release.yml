@@ -96,6 +96,7 @@ jobs:
 
 
   github-releases-to-discord:
+    needs: [ build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -110,3 +111,4 @@ jobs:
           content: "||@everyone||"
           footer_title: "Changelog"
           reduce_headings: true
+          release_name: ${{ github.ref_name }}
