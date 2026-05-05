@@ -1,11 +1,7 @@
-﻿package li.kelp.vuetale.extensions
+﻿package li.kelp.vuetale.helpers
 
-import com.hypixel.hytale.component.Component
-import com.hypixel.hytale.component.ComponentType
-import com.hypixel.hytale.server.core.universe.PlayerRef
 import com.hypixel.hytale.server.core.universe.Universe
 import com.hypixel.hytale.server.core.universe.world.World
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 

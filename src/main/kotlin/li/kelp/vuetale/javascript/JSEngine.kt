@@ -398,6 +398,7 @@ class JSEngine : AutoCloseable {
     /**
      * Evaluate a plain (non-module) JavaScript snippet on the V8 thread.
      * Microtasks (Promises, Vue scheduler) are flushed immediately after.
+     * Blocks the calling thread until the script completes.
      * If the caller is already on the V8 thread, runs inline to avoid deadlock.
      */
     fun evalScript(script: String) {
@@ -410,6 +411,21 @@ class JSEngine : AutoCloseable {
             v8Runtime.getExecutor(script).executeVoid()
             runCatching { v8Runtime.await(V8AwaitMode.RunNoWait) }
         }.get()
+    }
+
+    /**
+     * Fire-and-forget variant of [evalScript].
+     * Submits the script to the V8 thread but does **not** block the caller.
+     * Use this from threads that must not stall (e.g. the world tick thread during teardown).
+     */
+    fun evalScriptAsync(script: String) {
+        if (!isAlive) return
+        v8Executor.submit {
+            runCatching {
+                v8Runtime.getExecutor(script).executeVoid()
+                runCatching { v8Runtime.await(V8AwaitMode.RunNoWait) }
+            }.onFailure { logger.fine("evalScriptAsync error: ${it.message}") }
+        }
     }
 
     /**

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "li.kelp"
-version = "1.0.25"
+version = "1.0.28"
 
 repositories {
     mavenCentral()

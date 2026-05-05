@@ -1,43 +1,44 @@
-import { defineComponent as b, ref as s, onBeforeUnmount as G, openBlock as v, createElementBlock as d, createVNode as l, unref as t, withCtx as T, createElementVNode as u, toDisplayString as a, createBlock as I, createCommentVNode as D, Fragment as R, renderList as S } from "vue";
+import { defineComponent as M, ref as i, onBeforeUnmount as b, openBlock as v, createElementBlock as h, createVNode as l, unref as t, withCtx as T, createElementVNode as u, toDisplayString as a, createBlock as G, createCommentVNode as w, Fragment as D, renderList as S } from "vue";
 import { Common as r } from "../components/Common.js";
-import { Core as x } from "../components/core/index.js";
-import { useData as i } from "../composables/useData.js";
-const N = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
+import { Core as E } from "../components/core/index.js";
+import { useData as c } from "../composables/useData.js";
+const W = { anchor: { Full: 1, Left: 0, Right: 0 } }, K = {
   "layout-mode": "Top",
   "flex-weight": 1,
   anchor: { Full: 1 },
   background: { Color: "#444444" }
-}, w = { "layout-mode": "TopScrolling" }, j = /* @__PURE__ */ b({
+}, O = { "layout-mode": "TopScrolling" }, m = /* @__PURE__ */ M({
   __name: "TestPage",
-  setup(K) {
+  setup(x) {
     console.log("WORKS!");
-    const C = i("testFn", () => {
-    }), E = i("testFn2", (e, n) => {
+    const I = c("testFn", () => {
+    }), V = c("testFn2", (e, n) => {
     });
-    function F() {
-      console.log("CLICKED ME"), m.value = !m.value, C.value(), console.log("Return of testFn2: ", E.value(123, "hello"));
+    function C() {
+      console.log("CLICKED ME"), _.value = !_.value, I.value(), console.log("Return of testFn2: ", V.value(123, "hello")), R.value();
     }
-    const m = s(!1), p = s("nothing yet"), _ = i("test"), V = i("test2"), y = i("counter"), o = s([]);
-    function A() {
+    const _ = i(!1), d = i("nothing yet"), U = c("test"), F = c("test2"), H = c("counter"), R = c("close", () => {
+    }), o = i([]);
+    function y() {
       o.value.push({ name: `Entry ${o.value.length + 1}`, toggle: !1 });
     }
-    function B(e) {
+    function A(e) {
       o.value.splice(e, 1);
     }
-    function k(e) {
+    function B(e) {
       if (e > 0) {
         const n = o.value[e];
         o.value[e] = o.value[e - 1], o.value[e - 1] = n;
       }
     }
-    const h = s(0), f = s(0), H = setInterval(() => {
-      h.value++;
-    }, 1e3), L = setInterval(() => {
+    const g = i(0), f = i(0), N = setInterval(() => {
+      g.value++;
+    }, 1e3), k = setInterval(() => {
       f.value++;
     }, 1500);
-    return G(() => {
-      clearInterval(H), clearInterval(L);
-    }), (e, n) => (v(), d("Group", N, [
+    return b(() => {
+      clearInterval(N), clearInterval(k);
+    }), (e, n) => (v(), h("Group", W, [
       l(t(r).Container, {
         anchor: { Height: 800, Width: 600 },
         "close-button": !0
@@ -45,51 +46,51 @@ const N = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
         title: T(() => [
           l(t(r).Title, {
             class: "",
-            text: m.value ? "Title example" : "Anotherx title"
+            text: _.value ? "Title example" : "Anotherx title"
           }, null, 8, ["text"])
         ]),
         content: T(() => [
-          u("Group", W, [
+          u("Group", K, [
             u("Group", null, [
-              u("Label", null, a(p.value) + " | " + a(t(_)) + " " + a(t(V)?.a) + " " + a(t(y)) + " | Counter1: " + a(h.value) + " | Counter2: " + a(f.value), 1)
+              u("Label", null, a(d.value) + " | " + a(t(U)) + " " + a(t(F)?.a) + " " + a(t(H)) + " | Counter1: " + a(g.value) + " | Counter2: " + a(f.value), 1)
             ]),
             n[1] || (n[1] = u("TextField", null, null, -1)),
             l(t(r).TextButton, {
               text: "Example test",
-              onActivating: F,
+              onActivating: C,
               anchor: { Height: 20, Top: 80 }
             }),
-            m.value ? (v(), I(t(x).TextField, {
+            _.value ? (v(), G(t(E).TextField, {
               key: 0,
               decoration: { Default: {} },
-              modelValue: p.value,
-              "onUpdate:modelValue": n[0] || (n[0] = (c) => p.value = c),
+              modelValue: d.value,
+              "onUpdate:modelValue": n[0] || (n[0] = (s) => d.value = s),
               anchor: { Height: 120, Top: 10, Width: 200 }
-            }, null, 8, ["modelValue"])) : D("", !0),
-            u("Group", w, [
-              (v(!0), d(R, null, S(o.value, (c, g) => (v(), d("Group", {
-                key: g,
+            }, null, 8, ["modelValue"])) : w("", !0),
+            u("Group", O, [
+              (v(!0), h(D, null, S(o.value, (s, p) => (v(), h("Group", {
+                key: p,
                 anchor: { Height: 200 }
               }, [
-                u("Label", null, a(c.name), 1),
-                l(t(x).TextField, {
-                  modelValue: c.name,
-                  "onUpdate:modelValue": (U) => c.name = U
+                u("Label", null, a(s.name), 1),
+                l(t(E).TextField, {
+                  modelValue: s.name,
+                  "onUpdate:modelValue": (L) => s.name = L
                 }, null, 8, ["modelValue", "onUpdate:modelValue"]),
                 l(t(r).TextButton, {
                   text: "Remove",
-                  onActivating: () => B(g),
+                  onActivating: () => A(p),
                   anchor: { Height: 20, Top: 5, Left: 100 }
                 }, null, 8, ["onActivating"]),
                 l(t(r).TextButton, {
                   text: "Up",
-                  onActivating: () => k(g),
+                  onActivating: () => B(p),
                   anchor: { Height: 20, Top: 5, Left: 160 }
                 }, null, 8, ["onActivating"])
               ]))), 128)),
               l(t(r).TextButton, {
                 text: "Add Entry",
-                onActivating: A,
+                onActivating: y,
                 anchor: { Height: 20, Top: 10 }
               })
             ])
@@ -100,7 +101,9 @@ const N = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
     ]));
   }
 });
+m.__hmrId = "265dd60d";
+typeof __VUE_HMR_RUNTIME__ < "u" && (__VUE_HMR_RUNTIME__.createRecord(m.__hmrId, m) || __VUE_HMR_RUNTIME__.reload(m.__hmrId, m));
 export {
-  j as default
+  m as default
 };
-//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiVGVzdFBhZ2UudnVlLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OyJ9
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiVGVzdFBhZ2UudnVlLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OyJ9

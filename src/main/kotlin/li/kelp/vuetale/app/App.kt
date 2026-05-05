@@ -267,7 +267,14 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
             logger.warning("Tried to mount but App '${getId()}' is already mounted")
             return
         }
-        getEngine().evalScript("_vt.getUserApp('${getId()}').mount(_vt.getUserAppRef('${getId()}'));")
+        // Set the current app ID context so any setTimeout/setInterval calls during
+        // component setup (onMounted, etc.) are tagged with this app's ID for later
+        // cancellation when the app is dismissed.
+        getEngine().evalScript("""
+            globalThis.__vt_currentAppId = '${getId()}';
+            _vt.getUserApp('${getId()}').mount(_vt.getUserAppRef('${getId()}'));
+            globalThis.__vt_currentAppId = null;
+        """.trimIndent())
         logger.info("Mounted App '${getId()}'")
         isMounted = true
     }
@@ -293,23 +300,28 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
             logger.warning("Tried to unmount but App '${getId()}' is not mounted")
             return
         }
-        // Mark unmounted immediately so callers on any thread see the correct state.
-        isMounted = false
-        val engine = getEngine()
         val appId = getId()
-        // Dispatch all V8 cleanup to the V8 thread without blocking the caller.
-        // unmount() is invoked from VuetaleUIPage.onDismiss() on the Hytale world tick
-        // thread.  Blocking that thread waiting for the V8 isolate lock causes a
-        // multi-second timeout that disconnects the player and stalls the server.
-        engine.submitToV8Thread {
-            runCatching { engine.evalScript("_vt.getUserApp('$appId').unmount();") }
-            eventRegistry.closeAll()
-            runCatching {
-                try {
-                    JSEngine.instance.bridge.unregisterHostCallbacksForApp(appId)
-                } catch (e: Exception) {
-                    logger.fine("Failed to unregister host callbacks for $appId during unmount: ${e.message}")
-                }
+        val engine = getEngine()
+
+        // Use fire-and-forget (non-blocking) script dispatch so that the calling thread
+        // (typically the world tick thread) is never blocked waiting for the V8 thread.
+        // Blocking here caused InterruptedException when the server shut down or
+        // programmatic closePage() was called from a tick handler.
+        if (engine.isAlive) {
+            engine.evalScriptAsync(
+                "try { _vt.cancelTimersForApp('$appId'); } catch(e) {}" +
+                "\ntry { var __a = _vt.getUserApp('$appId'); if(__a) __a.unmount(); } catch(e) {}"
+            )
+        }
+
+        isMounted = false
+        eventRegistry.closeAll()
+        // Also unregister any host callbacks tied to this app
+        runCatching {
+            try {
+                JSEngine.instance.bridge.unregisterHostCallbacksForApp(getId())
+            } catch (e: Exception) {
+                logger.fine("Failed to unregister host callbacks for ${getId()} during unmount: ${e.message}")
             }
         }
     }

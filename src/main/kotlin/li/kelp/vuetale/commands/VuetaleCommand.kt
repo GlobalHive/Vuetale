@@ -59,5 +59,9 @@ class VuetaleCommand : AbstractPlayerCommand("vuetale", "Super test command!") {
         ui.setData("testFn", { testPropagated() })
         ui.setData("testFn2", this::testWithArgsAndReturn)
 
+        ui.setData("close", {
+            ui.closePage()
+        })
+
     }
 }

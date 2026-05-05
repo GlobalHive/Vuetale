@@ -4,8 +4,12 @@ import com.hypixel.hytale.component.Ref
 import com.hypixel.hytale.component.Store
 import com.hypixel.hytale.server.core.entity.entities.Player
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime
+import com.hypixel.hytale.protocol.packets.interface_.Page
+import com.hypixel.hytale.server.core.entity.entities.player.pages.PageManager
 import com.hypixel.hytale.server.core.universe.PlayerRef
+import com.hypixel.hytale.server.core.universe.Universe
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore
+import li.kelp.vuetale.helpers.toWorld
 import li.kelp.vuetale.hytale.VuetaleUIHud
 import li.kelp.vuetale.hytale.VuetaleUIPage
 import java.util.UUID
@@ -106,6 +110,19 @@ class PlayerUi internal constructor(
         page?.app?.let { app ->
             if (app.isMounted) app.unmount()
         }
+
+        playerRef?.let { ref ->
+            ref.worldUuid?.let { worldUuid ->
+                worldUuid.toWorld()?.execute {
+                    val reference = ref.reference!!
+                    reference.store.getComponent(reference, Player.getComponentType())?.let { player ->
+                        player.pageManager.setPage(reference, reference.store, Page.None)
+                    }
+                }
+            }
+
+        }
+
         page = null
     }
 

@@ -316,26 +316,43 @@ class VuetaleUIPage(
     ) {
         super.handleDataEvent(ref, store, data)
 
+        // Drop events that arrive after the page has been dismissed (e.g. stale packets
+        // sent by the client after pressing ESC). Without this guard, runOnV8Thread's
+        // Future.get() can throw InterruptedException if the thread is interrupted
+        // during page teardown.
+        if (!isActive) return
+
         // Capture only plain values here – never capture the V8ValueFunction itself outside
         // the V8 thread, because a concurrent hot-reload may close the old runtime and clear
         // the event registry between this line and the task actually executing on the V8 thread.
         val routingKey = data.routingKey
         val value = data.value
 
-        JSEngine.instance.runOnV8Thread {
-            // Re-fetch the binding *inside* the V8 task so we always use the live reference.
-            // If a hot-reload fired in the meantime, forceReset() will have cleared the
-            // registry and this returns null – skipping callVoid before touching the closed runtime.
-            val liveBinding = app.eventRegistry.findByRoutingKey(routingKey)
-            if (liveBinding == null) {
-                logger.warning("No binding found for routingKey='$routingKey' (may be stale after hot-reload)")
-                return@runOnV8Thread
+        try {
+            JSEngine.instance.runOnV8Thread {
+                // Re-fetch the binding *inside* the V8 task so we always use the live reference.
+                // If a hot-reload fired in the meantime, forceReset() will have cleared the
+                // registry and this returns null – skipping callVoid before touching the closed runtime.
+                val liveBinding = app.eventRegistry.findByRoutingKey(routingKey)
+                if (liveBinding == null) {
+                    logger.warning("No binding found for routingKey='$routingKey' (may be stale after hot-reload)")
+                    return@runOnV8Thread
+                }
+                runCatching {
+                    liveBinding.callback.callVoid(null, value)
+                }.onFailure {
+                    logger.warning("Error invoking callback for '$routingKey': ${it.message}")
+                }
             }
-            runCatching {
-                liveBinding.callback.callVoid(null, value)
-            }.onFailure {
-                logger.warning("Error invoking callback for '$routingKey': ${it.message}")
-            }
+        } catch (_: InterruptedException) {
+            // The server thread was interrupted (e.g. during world shutdown or page dismissal).
+            // Restore the interrupt flag and drop this event silently.
+            Thread.currentThread().interrupt()
+            logger.fine("handleDataEvent interrupted for routingKey='$routingKey' (page may have been dismissed)")
+            return
+        } catch (e: Exception) {
+            logger.warning("handleDataEvent failed for routingKey='$routingKey': ${e.message}")
+            return
         }
 
         // Acknowledge the event so Hytale does not consider the page stale
