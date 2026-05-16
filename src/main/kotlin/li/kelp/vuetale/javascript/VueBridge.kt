@@ -10,6 +10,7 @@ import com.caoccao.javet.values.reference.V8ValueObject
 import li.kelp.vuetale.app.App
 import li.kelp.vuetale.app.AppManager
 import li.kelp.vuetale.events.VueEventMapper
+import li.kelp.vuetale.extension.HandleResult
 import li.kelp.vuetale.property.Property
 import li.kelp.vuetale.property.PropertyBoolean
 import li.kelp.vuetale.property.PropertyNameMap
@@ -27,7 +28,6 @@ import li.kelp.vuetale.util.StringUtil.fromKebabCaseToPascalCase
 import li.kelp.vuetale.validator.*
 import java.lang.reflect.InvocationTargetException
 import java.util.logging.Logger
-import li.kelp.vuetale.javascript.DebugConfig
 import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
@@ -206,7 +206,14 @@ class VueBridge(
         el.properties["Text"] = PropertyString("Text", text)
         if (el.isVtSkipUpdate()) return  // Vuetale flag suppresses dirty flush
         val app = AppManager.getApp(appId)
-        if (DebugConfig.enabled) logger.info("[vuetaledebug] setElementText app=$appId el=${el.getId()} textPreview=${if (text.length>100) text.substring(0,100)+"..." else text}")
+        if (DebugConfig.enabled) logger.info(
+            "[vuetaledebug] setElementText app=$appId el=${el.getId()} textPreview=${
+                if (text.length > 100) text.substring(
+                    0,
+                    100
+                ) + "..." else text
+            }"
+        )
         app?.dirtyElementIds?.add(el.id)
         app?.markDirty()
     }
@@ -284,9 +291,7 @@ class VueBridge(
     fun remove(appId: String, element: Element?) {
         if (element == null) return
         val app = AppManager.getApp(appId)
-        if (element.varFrom != null) {
-            app?.removeDependency(element.varFrom!!)
-        }
+
         app?.removedElementSelectors?.add(element.buildUniqueSelector())
         // Clean up this element and every descendant: unregister event bindings and
         // remove from idElementMap.  Only calling remove() on the root would leave
@@ -295,6 +300,8 @@ class VueBridge(
         cleanupElementTree(app, element)
         if (DebugConfig.enabled) logger.info("[vuetaledebug] remove app=$appId element=${element.buildUniqueSelector()}")
         app?.markDirty()
+
+        AppManager.extensions.forEach { it.afterRemoveElement(app, element) }
     }
 
     /**
@@ -314,13 +321,31 @@ class VueBridge(
 
     fun patchProp(appId: String, el: Element, key: String, prevValue: V8Value, nextValue: V8Value) {
         if (DebugConfig.enabled) {
-            val pv = try { if (prevValue.isNullOrUndefined) "<null>" else prevValue.javaClass.simpleName } catch (e: Exception) { "<err>" }
-            val nv = try { if (nextValue.isNullOrUndefined) "<null>" else nextValue.javaClass.simpleName } catch (e: Exception) { "<err>" }
+            val pv = try {
+                if (prevValue.isNullOrUndefined) "<null>" else prevValue.javaClass.simpleName
+            } catch (e: Exception) {
+                "<err>"
+            }
+            val nv = try {
+                if (nextValue.isNullOrUndefined) "<null>" else nextValue.javaClass.simpleName
+            } catch (e: Exception) {
+                "<err>"
+            }
             logger.fine("[vuetaledebug] patchProp app=$appId el=${el.getId()} key=$key prev=$pv next=$nv")
         }
         fun clearPropertiesWithOrigin(origin: PropertyOrigin) {
-            el.properties = el.properties.filter { it.value.origin != origin }.toMutableMap()
+            el.properties = el.properties.filter { it.value.origin != origin.name }.toMutableMap()
         }
+
+        if (AppManager.extensions.any {
+                it.patchProp(
+                    appId,
+                    el,
+                    key,
+                    prevValue,
+                    nextValue
+                ) != HandleResult.NOT_HANDLED
+            }) return
 
         when (key) {
             "style" -> {
@@ -340,7 +365,7 @@ class VueBridge(
                                 else ->
                                     PropertyNumber(keyCapitalized, sv.asKtDouble())
                             }
-                            prop.origin = PropertyOrigin.Style
+                            prop.origin = PropertyOrigin.Style.name
                             el.properties[keyCapitalized] = prop
                         }
                     }
@@ -367,21 +392,6 @@ class VueBridge(
                 if (!nextValue.isNullOrUndefined) {
                     el.customId = nextValue.asKtString().replace(".", "")
                 }
-            }
-
-            "varFrom" -> {
-                val prev = if (prevValue.isNullOrUndefined) null else prevValue.asKtString()
-                if (prev != null) {
-                    el.app?.removeDependency(prev)
-                }
-                el.varFrom = if (nextValue.isNullOrUndefined) null else nextValue.asKtString()
-                if (el.varFrom != null) {
-                    el.app?.addDependency(el.varFrom!!)
-                }
-            }
-
-            "varName" -> {
-                el.varName = if (nextValue.isNullOrUndefined) null else nextValue.asKtString()
             }
 
             else -> {
@@ -446,7 +456,7 @@ class VueBridge(
                         }
                     } else {
                         logger.warning("Unknown property '$keyCapitalized', ignoring")
-                            if (DebugConfig.enabled) logger.info("[vuetaledebug] patchProp unknownProperty app=$appId el=${el.getId()} prop=$keyCapitalized")
+                        if (DebugConfig.enabled) logger.info("[vuetaledebug] patchProp unknownProperty app=$appId el=${el.getId()} prop=$keyCapitalized")
                     }
                 }
             }

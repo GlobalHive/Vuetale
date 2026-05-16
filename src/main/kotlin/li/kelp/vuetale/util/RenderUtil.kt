@@ -9,16 +9,6 @@ object RenderUtil {
         return "  ".repeat(depth)
     }
 
-    fun renderImports(app: App): String {
-        var render = ""
-
-        app.dependencies.forEach {
-            render += "\$${it.value.name} = \"${it.value.origin}\";\n"
-        }
-
-        return render
-    }
-
     fun simpleElementRender(element: Element, depth: Int): String {
         var render = indent(depth)
 

@@ -13,7 +13,6 @@ class Plugin(init: JavaPluginInit) : JavaPlugin(init) {
     private var jsEngine: JSEngine? = null
 
     override fun setup() {
-        logger.atInfo().log("Hello World!")
         //val app = AppManager.createApp("test", AppType.Page)
         // JSEngine.instance is initialised lazily the first time App accesses it.
         // Register this JAR's resources under the 'vt:@core' alias so other mods
@@ -27,6 +26,9 @@ class Plugin(init: JavaPluginInit) : JavaPlugin(init) {
 
         this.getCommandRegistry().registerCommand(VuetaleCommand())
         this.getCommandRegistry().registerCommand(VuetaleDebugCommand())
+
+        logger.atInfo().log("Vuetale initialized")
+        
     }
 
     override fun shutdown() {

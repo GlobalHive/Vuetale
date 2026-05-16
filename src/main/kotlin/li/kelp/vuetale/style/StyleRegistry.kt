@@ -82,15 +82,17 @@ object StyleRegistry {
             "anchorLeft" -> listOf(
                 PropertyRecord("Anchor", mutableMapOf("left" to PropertyNumber("left", value.toDouble())))
             )
+
             "anchorRight" -> listOf(
                 PropertyRecord("Anchor", mutableMapOf("right" to PropertyNumber("right", value.toDouble())))
             )
+
             else -> listOf()
         }
     }
 
     fun getPropertiesForClass(className: String): List<Property> {
         return (classProperties[className] ?: emptyList())
-            .map { it.clone().apply { origin = PropertyOrigin.Class } }
+            .map { it.clone().apply { origin = PropertyOrigin.Class.name } }
     }
 }

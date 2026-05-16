@@ -56,9 +56,6 @@ abstract class Element(var tag: String) {
      */
     var vuetaleProperties: MutableMap<String, Any?> = mutableMapOf()
 
-    var varFrom: String? = null
-    var varName: String? = null
-
     @JvmName("getUniqueId")
     fun getId(): String {
         if (customId != null) {

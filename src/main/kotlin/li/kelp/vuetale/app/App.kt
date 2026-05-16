@@ -1,20 +1,15 @@
 ﻿package li.kelp.vuetale.app
 
 import com.caoccao.javet.values.V8Value
-import com.caoccao.javet.values.reference.V8ValueObject
 import li.kelp.vuetale.events.EventRegistry
 import li.kelp.vuetale.javascript.JSEngine
 import li.kelp.vuetale.tree.Element
 import li.kelp.vuetale.tree.RootElement
 import java.util.logging.Logger
 
-data class Dependency(var origin: String, var name: String, var dependents: Int)
-
 class App(val owner: String, val type: AppType, var componentPath: String? = null) {
     private val logger: Logger = Logger.getLogger("App $owner-$type")
     private fun getEngine() = JSEngine.instance
-
-    val dependencies: MutableMap<String, Dependency> = mutableMapOf()
 
     /** Persisted copy of every setData call – re-pushed to V8 after a hot-reload. */
     private val dataCache: MutableMap<String, Any?> = LinkedHashMap()
@@ -174,29 +169,6 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
         }
     }
 
-    private fun getDependencyKey(origin: String): String {
-        val random = (0..5).map { ('a'..'z').random() }.joinToString("")
-        return origin.replace(Regex("[^A-Za-z0-9]"), "") + "VT" + random
-    }
-
-    fun addDependency(origin: String, asName: String? = null) {
-        if (dependencies.get(origin) == null) {
-            val key = asName ?: getDependencyKey(origin)
-            dependencies[origin] = Dependency(origin, key, 0)
-        }
-        val dep = dependencies[origin]
-        dep!!.dependents++
-    }
-
-    fun removeDependency(origin: String) {
-        val dep = dependencies[origin] ?: return
-        dep.dependents--
-        if (dep.dependents <= 0) {
-            dependencies.remove(origin)
-        }
-    }
-
-    fun getDependencyName(origin: String) = dependencies[origin]?.name
 
     /**
      * Push a reactive data value to the Vue side for this app.
@@ -270,11 +242,13 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
         // Set the current app ID context so any setTimeout/setInterval calls during
         // component setup (onMounted, etc.) are tagged with this app's ID for later
         // cancellation when the app is dismissed.
-        getEngine().evalScript("""
+        getEngine().evalScript(
+            """
             globalThis.__vt_currentAppId = '${getId()}';
             _vt.getUserApp('${getId()}').mount(_vt.getUserAppRef('${getId()}'));
             globalThis.__vt_currentAppId = null;
-        """.trimIndent())
+        """.trimIndent()
+        )
         logger.info("Mounted App '${getId()}'")
         isMounted = true
     }
@@ -310,7 +284,7 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
         if (engine.isAlive) {
             engine.evalScriptAsync(
                 "try { _vt.cancelTimersForApp('$appId'); } catch(e) {}" +
-                "\ntry { var __a = _vt.getUserApp('$appId'); if(__a) __a.unmount(); } catch(e) {}"
+                        "\ntry { var __a = _vt.getUserApp('$appId'); if(__a) __a.unmount(); } catch(e) {}"
             )
         }
 

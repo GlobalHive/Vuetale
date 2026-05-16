@@ -11,12 +11,18 @@ export declare const USER_APPS_META: Map<string, VuetaleMeta>;
  * track individual key additions and mutations directly.
  */
 export declare const USER_APPS_DATA: Map<string, Record<string, unknown>>;
+export declare const PLAYER_DATA: Map<string, Record<string, unknown>>;
+export declare const GLOBAL_DATA: import('vue').Reactive<Map<string, unknown>>;
+export declare function setPlayerData(id: string, key: string, value: unknown): void;
+export declare function setGlobalData(key: string, value: unknown): void;
 /**
  * Set (or create) a reactive data value for an app.
  * Called from the Kotlin side via JSEngine / loaderCtx.invoke.
  */
 export declare function setAppData(id: string, key: string, value: unknown): void;
 export declare function getAppData(id: string, key: string): unknown;
+export declare function getPlayerData(id: string, key: string): unknown;
+export declare function getGlobalData(key: string): unknown;
 export declare function registerComponent(path: string, component: unknown): void;
 export declare function getRegisteredComponent(path: string): unknown | undefined;
 export declare function removeUserApp(id: string): void;

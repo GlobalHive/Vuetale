@@ -23,7 +23,7 @@ val PropertyNameMap = mapOf(
     "ElStyle" to "Style"
 )
 
-abstract class Property(var name: String, var origin: PropertyOrigin = PropertyOrigin.Default) {
+abstract class Property(var name: String, var origin: String = PropertyOrigin.Default.name) {
     var parent: PropertyRecord? = null
 
     open fun isValid(): Boolean {
