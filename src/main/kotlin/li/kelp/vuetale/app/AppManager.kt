@@ -9,15 +9,16 @@ import li.kelp.vuetale.validator.initializeSchemas
 
 
 object AppManager {
+    val apps: MutableMap<String, App> = mutableMapOf()
+
+    val extensions = mutableListOf<VuetaleExtension>()
+
     init {
         initializeElements()
         initializeSchemas()
         registerCoreExtensions()
     }
 
-    val apps: MutableMap<String, App> = mutableMapOf()
-
-    val extensions = mutableListOf<VuetaleExtension>()
 
     fun registerExtension(extension: Class<out VuetaleExtension>) {
         val instance = extension.getDeclaredConstructor().newInstance()
@@ -58,21 +59,21 @@ object AppManager {
         apps[app.getId()] = app
     }
 
-    fun removeApp(id: String) {
+    fun removeApp(id: String, unmount: Boolean = true) {
 
         if (extensions.any { it.beforeRemoveApp(id) !== HandleResult.NOT_HANDLED }) return
 
         getApp(id)?.let {
-            if (it.isMounted) {
+            if (unmount && it.isMounted) {
                 it.unmount()
             }
         }
         apps.remove(id)
     }
 
-    fun removeApp(owner: String, type: AppType) {
+    fun removeApp(owner: String, type: AppType, unmount: Boolean = true) {
         val id = getAppId(owner, type)
-        removeApp(id)
+        removeApp(id, unmount)
     }
 
     fun removeOwnerApps(owner: String) {

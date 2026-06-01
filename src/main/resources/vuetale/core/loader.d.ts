@@ -12,7 +12,7 @@ export declare const USER_APPS_META: Map<string, VuetaleMeta>;
  */
 export declare const USER_APPS_DATA: Map<string, Record<string, unknown>>;
 export declare const PLAYER_DATA: Map<string, Record<string, unknown>>;
-export declare const GLOBAL_DATA: import('vue').Reactive<Map<string, unknown>>;
+export declare const GLOBAL_DATA: Map<string, unknown>;
 export declare function setPlayerData(id: string, key: string, value: unknown): void;
 export declare function setGlobalData(key: string, value: unknown): void;
 /**

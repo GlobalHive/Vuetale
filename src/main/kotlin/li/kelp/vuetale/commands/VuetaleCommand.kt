@@ -33,35 +33,30 @@ class VuetaleCommand : AbstractPlayerCommand("vuetale", "Super test command!") {
         @Nonnull playerRef: PlayerRef,
         @Nonnull world: World
     ) {
-        val player: Player? = store.getComponent(ref, Player.getComponentType()) // also a component
+        logger.info("VuetaleCommand execute() called for player: ${playerRef.uuid}")
+        try {
+            val ui = PlayerUiManager.openPage(
+                playerRef,
+                ref as Ref<EntityStore>,
+                store as Store<EntityStore>,
+                "core",
+                "TestPage"
+            )
 
-//        CompletableFuture.runAsync {
-//            player?.pageManager?.openCustomPage(
-//                ref,
-//                store,
-//                VuetaleUIPage(playerRef, playerRef.uuid.toString(), AppType.Page)
-//            )
-//        }
+            class Abc(val a: String, val b: Int)
 
-        val ui = PlayerUiManager.openPage(
-            playerRef,
-            ref as Ref<EntityStore>,
-            store as Store<EntityStore>,
-            "core",
-            "TestPage"
-        )
+            ui.setData("test", "Hello this is a test!")
+            ui.setData("test2", Abc("abc", 123))
+            ui.setData("testFn", { testPropagated() })
+            ui.setData("testFn2", this::testWithArgsAndReturn)
 
+            ui.setData("close", {
+                ui.closePage()
+            })
 
-        class Abc(val a: String, val b: Int)
-
-        ui.setData("test", "Hello this is a test!")
-        ui.setData("test2", Abc("abc", 123))
-        ui.setData("testFn", { testPropagated() })
-        ui.setData("testFn2", this::testWithArgsAndReturn)
-
-        ui.setData("close", {
-            ui.closePage()
-        })
-
+            logger.info("VuetaleCommand execute() completed successfully for player: ${playerRef.uuid}")
+        } catch (e: Exception) {
+            logger.severe("VuetaleCommand execute() failed for player ${playerRef.uuid}: ${e.javaClass.simpleName}: ${e.message}\n${e.stackTraceToString()}")
+        }
     }
 }

@@ -1,5 +1,5 @@
-function e(t) {
-  return "vt:@core/" + t;
+function e(o) {
+  return "Common/core/" + o;
 }
 export {
   e as $asset

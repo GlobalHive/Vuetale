@@ -1,13 +1,13 @@
-import { reactive as h, shallowReactive as u, ref as m } from "vue";
-import { hytaleRenderer as v } from "./renderer.js";
-import y from "./components/App.vue.js";
+import { shallowReactive as u, ref as h } from "vue";
+import { hytaleRenderer as m } from "./renderer.js";
+import v from "./components/App.vue.js";
 /* empty css                    */
-import { flushPendingStyles as k, applyStyles as T } from "./styles.js";
-function d(t, o) {
+import { flushPendingStyles as y, applyStyles as k } from "./styles.js";
+function T(t, o) {
   globalThis[t] = o;
 }
-const l = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Map(), _ = /* @__PURE__ */ new Map(), g = /* @__PURE__ */ new Map(), c = /* @__PURE__ */ new Map(), f = /* @__PURE__ */ new Map(), A = h(/* @__PURE__ */ new Map());
-function G(t, o, e) {
+const l = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Map(), _ = /* @__PURE__ */ new Map(), g = /* @__PURE__ */ new Map(), c = /* @__PURE__ */ new Map(), f = /* @__PURE__ */ new Map(), A = /* @__PURE__ */ new Map();
+function j(t, o, e) {
   let n = f.get(t);
   n || (n = u({}), f.set(t, n));
   let a = e;
@@ -27,7 +27,7 @@ function G(t, o, e) {
   }
   n[o] = a;
 }
-function B(t, o) {
+function G(t, o) {
   let e = o;
   try {
     if (o && typeof o == "object" && "_vtHostFnId" in o) {
@@ -45,7 +45,7 @@ function B(t, o) {
   }
   A.set(t, e);
 }
-function P(t, o, e) {
+function d(t, o, e) {
   let n = c.get(t);
   n || (n = u({}), c.set(t, n));
   let a = e;
@@ -65,27 +65,27 @@ function P(t, o, e) {
   }
   n[o] = a;
 }
-function N(t, o) {
+function B(t, o) {
   const e = c.get(t);
   if (e)
     return e[o];
 }
-function L(t, o) {
+function N(t, o) {
   const e = f.get(t);
   if (e)
     return e[o];
 }
-function V(t) {
+function L(t) {
   return A.get(t);
 }
 const b = /* @__PURE__ */ new Map();
-function R(t, o) {
+function P(t, o) {
   b.set(t, o);
 }
-function w(t) {
+function R(t) {
   return b.get(t);
 }
-function H(t) {
+function w(t) {
   const o = l.get(t);
   if (o) {
     try {
@@ -95,44 +95,44 @@ function H(t) {
     o.unmount(), l.delete(t), i.delete(t), _.delete(t), c.delete(t);
   }
 }
-function C(t, o) {
-  console.log("Creating user app", t, o ?? "(no component)"), k(), c.has(t) || c.set(t, u({}));
-  const e = m(o);
+function H(t, o) {
+  console.log("Creating user app", t, o ?? "(no component)"), y(), c.has(t) || c.set(t, u({}));
+  const e = h(o);
   g.set(t, e);
-  const n = v(t).createApp(y);
+  const n = m(t).createApp(v);
   return n.provide("appId", t), n.provide("componentPathRef", e), l.set(t, n), n;
 }
-function D(t, o) {
+function C(t, o) {
   const e = g.get(t);
   e ? (e.value = o, console.log("navigateTo", t, o)) : console.warn("navigateTo: no app found with id", t);
 }
-function F(t) {
+function D(t) {
   return l.get(t);
 }
-function I(t) {
+function F(t) {
   return i.get(t);
 }
-function x(t) {
+function V(t) {
   return _.get(t);
 }
-function M(t, o) {
+function I(t, o) {
   const e = {
     _vtContainerId: t,
     getRoot: () => o.root
   };
   Object.defineProperty(e, "_vnode", { value: null, writable: !0, enumerable: !1, configurable: !0 }), Object.defineProperty(e, "__vue_app__", { value: null, writable: !0, enumerable: !1, configurable: !0 }), i.set(t, e);
 }
-d("_vt", {
-  applyStyles: T,
-  createUserApp: C,
-  getUserApp: F,
-  getUserAppRef: I,
-  registerUserAppRef: M,
-  removeUserApp: H,
-  navigateTo: D,
-  registerComponent: R,
-  setAppData: P,
-  getRegisteredComponent: w,
+T("_vt", {
+  applyStyles: k,
+  createUserApp: H,
+  getUserApp: D,
+  getUserAppRef: F,
+  registerUserAppRef: I,
+  removeUserApp: w,
+  navigateTo: C,
+  registerComponent: P,
+  setAppData: d,
+  getRegisteredComponent: R,
   cancelTimersForApp: (t) => {
     try {
       typeof globalThis.__vt_cancelTimersForApp == "function" && globalThis.__vt_cancelTimersForApp(t);
@@ -149,20 +149,20 @@ export {
   c as USER_APPS_DATA,
   _ as USER_APPS_META,
   i as USER_APPS_REF,
-  C as createUserApp,
-  N as getAppData,
-  V as getGlobalData,
-  L as getPlayerData,
-  w as getRegisteredComponent,
-  F as getUserApp,
-  x as getUserAppMeta,
-  I as getUserAppRef,
-  D as navigateTo,
-  R as registerComponent,
-  M as registerUserAppRef,
-  H as removeUserApp,
-  P as setAppData,
-  B as setGlobalData,
-  G as setPlayerData
+  H as createUserApp,
+  B as getAppData,
+  L as getGlobalData,
+  N as getPlayerData,
+  R as getRegisteredComponent,
+  D as getUserApp,
+  V as getUserAppMeta,
+  F as getUserAppRef,
+  C as navigateTo,
+  P as registerComponent,
+  I as registerUserAppRef,
+  w as removeUserApp,
+  d as setAppData,
+  G as setGlobalData,
+  j as setPlayerData
 };
 //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoibG9hZGVyLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OyJ9

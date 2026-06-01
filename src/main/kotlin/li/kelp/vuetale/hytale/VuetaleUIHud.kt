@@ -37,7 +37,7 @@ class VuetaleUIHud(
     appOwner: String,
     /** Initial component to render, e.g. `"vt:@core/huds/MyHud"`. */
     componentPath: String? = null,
-) : CustomUIHud(playerRef) {
+) : CustomUIHud(playerRef, "VuetaleUIHud[$appOwner]") {
 
     private val logger = Logger.getLogger("VuetaleUIHud[$appOwner]")
 
@@ -75,7 +75,7 @@ class VuetaleUIHud(
         // 3. Inject the entire rendered tree into #App
         val rendered = app.root.render(0)
         uiCommandBuilder.appendInline("#App", rendered)
-        if (DebugConfig.enabled) logger.info ("[vuetaledebug] Initial render:\n$rendered")
+        if (DebugConfig.enabled) logger.info("[vuetaledebug] Initial render:\n$rendered")
 
         // Clear stale mount-time tracking (same reasoning as VuetaleUIPage)
         app.hasStructuralChanges = false
@@ -144,7 +144,7 @@ class VuetaleUIHud(
      * keep the V8 tick non-blocking.
      */
     private fun sendUpdateAsync(cmdBuilder: UICommandBuilder, lockInterface: Boolean) {
-        if (DebugConfig.enabled) logger.info ("[vuetaledebug] Update render:\n${app.root.render(0)}")
+        if (DebugConfig.enabled) logger.info("[vuetaledebug] Update render:\n${app.root.render(0)}")
 
         CompletableFuture.runAsync {
             if (isActive) runCatching { update(lockInterface, cmdBuilder) }

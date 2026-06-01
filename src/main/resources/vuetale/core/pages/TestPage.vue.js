@@ -1,96 +1,96 @@
-import { defineComponent as G, ref as i, onBeforeUnmount as I, openBlock as v, createElementBlock as d, createVNode as l, unref as t, withCtx as T, createElementVNode as u, toDisplayString as a, createBlock as D, createCommentVNode as R, Fragment as S, renderList as N } from "vue";
+import { defineComponent as N, ref as i, onBeforeUnmount as b, openBlock as d, createElementBlock as h, createVNode as a, unref as t, withCtx as v, createElementVNode as u, toDisplayString as n, createBlock as M, createCommentVNode as G, Fragment as w, renderList as D } from "vue";
 import { Common as r } from "../components/Common.js";
-import { Core as x } from "../components/core/index.js";
+import { Core as f } from "../components/core/index.js";
 import { useData as c } from "../composables/useData.js";
-const W = { anchor: { Full: 1, Left: 0, Right: 0 } }, w = {
+import { $asset as T } from "../assets.js";
+const S = { anchor: { Full: 1, Left: 0, Right: 0 } }, W = {
   "layout-mode": "Top",
   "flex-weight": 1,
   anchor: { Full: 1 },
   background: { Color: "#444444" }
-}, K = { "layout-mode": "TopScrolling" }, q = /* @__PURE__ */ G({
+}, K = ["background"], $ = { "layout-mode": "TopScrolling" }, m = /* @__PURE__ */ N({
   __name: "TestPage",
-  setup(M) {
+  setup(E) {
     console.log("WORKS!");
-    const C = c("testFn", () => {
-    }), E = c("testFn2", (e, n) => {
+    const x = c("testFn", () => {
+    }), V = c("testFn2", (e, l) => {
     });
-    function F() {
-      console.log("CLICKED ME"), m.value = !m.value, C.value(), console.log("Return of testFn2: ", E.value(123, "hello")), A.value();
+    function H() {
+      console.log("CLICKED ME"), _.value = !_.value, x.value(), console.log("Return of testFn2: ", V.value(123, "hello")), R.value();
     }
-    const m = i(!1), p = i("nothing yet"), _ = c("test"), V = c("test2"), y = c("counter"), A = c("close", () => {
+    const _ = i(!1), p = i("nothing yet"), U = c("test"), C = c("test2"), F = c("counter"), R = c("close", () => {
     }), o = i([]);
-    function B() {
+    function y() {
       o.value.push({ name: `Entry ${o.value.length + 1}`, toggle: !1 });
     }
     function k(e) {
       o.value.splice(e, 1);
     }
-    function H(e) {
+    function I(e) {
       if (e > 0) {
-        const n = o.value[e];
-        o.value[e] = o.value[e - 1], o.value[e - 1] = n;
+        const l = o.value[e];
+        o.value[e] = o.value[e - 1], o.value[e - 1] = l;
       }
     }
-    const h = i(0), f = i(0), L = setInterval(() => {
-      h.value++;
-    }, 1e3), U = setInterval(() => {
-      f.value++;
-    }, 1500);
-    return I(() => {
-      clearInterval(L), clearInterval(U);
-    }), (e, n) => (v(), d("Group", W, [
-      l(t(r).Container, {
+    const L = i(0), A = i(0);
+    return b(() => {
+    }), (e, l) => (d(), h("Group", S, [
+      a(t(r).Container, {
         anchor: { Height: 800, Width: 600 },
         "close-button": !0
       }, {
-        title: T(() => [
-          l(t(r).Title, {
+        title: v(() => [
+          a(t(r).Title, {
             class: "",
-            text: m.value ? "Title example" : "Anotherx title"
+            text: _.value ? "Title example" : "Anotherx title"
           }, null, 8, ["text"])
         ]),
-        content: T(() => [
-          u("Group", w, [
+        content: v(() => [
+          u("Group", W, [
             u("Group", null, [
-              u("Label", null, a(p.value) + " | " + a(t(_)) + " " + a(t(V)?.a) + " " + a(t(y)) + " | Counter1: " + a(h.value) + " | Counter c: " + a(f.value), 1)
+              u("Label", null, n(p.value) + " | " + n(t(U)) + " " + n(t(C)?.a) + " " + n(t(F)) + " | Counter1: " + n(L.value) + " | " + n(t(T)("VuetaleLogo.png")) + " c: " + n(A.value), 1)
             ]),
-            n[1] || (n[1] = u("TextField", null, null, -1)),
-            l(t(r).TextButton, {
+            l[1] || (l[1] = u("TextField", null, null, -1)),
+            a(t(r).TextButton, {
               text: "Example test",
-              onActivating: F,
+              onActivating: H,
               anchor: { Height: 20, Top: 80 }
             }),
-            m.value ? (v(), D(t(x).TextField, {
+            _.value ? (d(), M(t(f).TextField, {
               key: 0,
               decoration: { Default: {} },
               modelValue: p.value,
-              "onUpdate:modelValue": n[0] || (n[0] = (s) => p.value = s),
+              "onUpdate:modelValue": l[0] || (l[0] = (s) => p.value = s),
               anchor: { Height: 120, Top: 10, Width: 200 }
-            }, null, 8, ["modelValue"])) : R("", !0),
-            u("Group", K, [
-              (v(!0), d(S, null, N(o.value, (s, g) => (v(), d("Group", {
+            }, null, 8, ["modelValue"])) : G("", !0),
+            u("Group", {
+              background: t(T)("VuetaleLogo.png"),
+              anchor: { Width: 200, Height: 300 }
+            }, null, 8, K),
+            u("Group", $, [
+              (d(!0), h(w, null, D(o.value, (s, g) => (d(), h("Group", {
                 key: g,
                 anchor: { Height: 200 }
               }, [
-                u("Label", null, a(s.name), 1),
-                l(t(x).TextField, {
+                u("Label", null, n(s.name), 1),
+                a(t(f).TextField, {
                   modelValue: s.name,
-                  "onUpdate:modelValue": (b) => s.name = b
+                  "onUpdate:modelValue": (B) => s.name = B
                 }, null, 8, ["modelValue", "onUpdate:modelValue"]),
-                l(t(r).TextButton, {
+                a(t(r).TextButton, {
                   text: "Remove",
                   onActivating: () => k(g),
                   anchor: { Height: 20, Top: 5, Left: 100 }
                 }, null, 8, ["onActivating"]),
-                l(t(r).TextButton, {
+                a(t(r).TextButton, {
                   text: "Up",
-                  onActivating: () => H(g),
+                  onActivating: () => I(g),
                   anchor: { Height: 20, Top: 5, Left: 160 }
                 }, null, 8, ["onActivating"])
               ]))), 128)),
-              l(t(r).TextButton, {
+              a(t(r).TextButton, {
                 text: "Add Entry",
-                onActivating: B,
+                onActivating: y,
                 anchor: { Height: 20, Top: 10 }
               })
             ])
@@ -101,7 +101,9 @@ const W = { anchor: { Full: 1, Left: 0, Right: 0 } }, w = {
     ]));
   }
 });
+m.__hmrId = "265dd60d";
+typeof __VUE_HMR_RUNTIME__ < "u" && (__VUE_HMR_RUNTIME__.createRecord(m.__hmrId, m) || __VUE_HMR_RUNTIME__.reload(m.__hmrId, m));
 export {
-  q as default
+  m as default
 };
-//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiVGVzdFBhZ2UudnVlLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OzsifQ==
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiVGVzdFBhZ2UudnVlLmpzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OyJ9

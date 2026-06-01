@@ -17,6 +17,24 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
     var isMounted = false
         private set
 
+    /**
+     * The current page/hud object that "owns" this app – set when a
+     * [li.kelp.vuetale.hytale.VuetaleUIPage] or similar takes over the app.
+     * Used by [onDismiss] to prevent a stale page from destroying an app that
+     * has already been claimed by a newer page instance.
+     */
+    @Volatile
+    var currentOwner: Any? = null
+
+    /**
+     * True when [unmount] has been called and the JS-side Vue app instance has been torn
+     * down.  Vue apps cannot be remounted after [app.unmount()], so [mount] must call
+     * [createUserApp] again to get a fresh Vue instance before calling [app.mount()].
+     * Set by [unmount], cleared by [createApp] (which calls createUserApp in JS).
+     */
+    @Volatile
+    private var needsJsRecreation = false
+
     var root: RootElement = RootElement()
 
     /** Holds all live Vue→Hytale event bindings registered for this app's elements. */
@@ -101,6 +119,7 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
             }
             result.close()
         }
+        needsJsRecreation = false
     }
 
     private fun updateReference() {
@@ -117,6 +136,8 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
     internal fun forceReset() {
         isMounted = false
         isDirty = false
+        currentOwner = null
+        needsJsRecreation = false
         root = RootElement().also { it.app = this }
         hasStructuralChanges = false
         removedElementSelectors.clear()
@@ -193,11 +214,11 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
             // send a hostFn marker to JS instead of the raw object.
             if (value != null && isJvmFunction(value)) {
                 val hostId = JSEngine.instance.bridge.registerHostCallback(getId(), value)
-                engine.runOnV8Thread {
+                engine.submitToV8Thread {
                     engine.loaderCtx.invoke<V8Value>("setAppData", getId(), key, mapOf("_vtHostFnId" to hostId)).close()
                 }
             } else {
-                engine.runOnV8Thread {
+                engine.submitToV8Thread {
                     engine.loaderCtx.invoke<V8Value>("setAppData", getId(), key, value).close()
                 }
             }
@@ -239,10 +260,30 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
             logger.warning("Tried to mount but App '${getId()}' is already mounted")
             return
         }
+
+        val engine = getEngine()
+
+        // Vue apps cannot be remounted after app.unmount(). If this app was previously
+        // unmounted, we must call createUserApp() again to get a fresh Vue instance
+        // before calling mount().  The createUserApp call is submitted to the V8 thread
+        // AFTER the async unmount script (queued by unmount()), so V8 processes them in
+        // the correct order: unmount → createUserApp → mount.
+        if (needsJsRecreation) {
+            engine.runOnV8Thread {
+                val result = if (componentPath != null) {
+                    engine.loaderCtx.invoke<V8Value>("createUserApp", getId(), componentPath!!)
+                } else {
+                    engine.loaderCtx.invoke<V8Value>("createUserApp", getId())
+                }
+                result.close()
+            }
+            needsJsRecreation = false
+        }
+
         // Set the current app ID context so any setTimeout/setInterval calls during
         // component setup (onMounted, etc.) are tagged with this app's ID for later
         // cancellation when the app is dismissed.
-        getEngine().evalScript(
+        engine.evalScript(
             """
             globalThis.__vt_currentAppId = '${getId()}';
             _vt.getUserApp('${getId()}').mount(_vt.getUserAppRef('${getId()}'));
@@ -277,10 +318,6 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
         val appId = getId()
         val engine = getEngine()
 
-        // Use fire-and-forget (non-blocking) script dispatch so that the calling thread
-        // (typically the world tick thread) is never blocked waiting for the V8 thread.
-        // Blocking here caused InterruptedException when the server shut down or
-        // programmatic closePage() was called from a tick handler.
         if (engine.isAlive) {
             engine.evalScriptAsync(
                 "try { _vt.cancelTimersForApp('$appId'); } catch(e) {}" +
@@ -289,6 +326,7 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
         }
 
         isMounted = false
+        needsJsRecreation = true  // Vue app can't be remounted; mount() will recreate it
         eventRegistry.closeAll()
         // Also unregister any host callbacks tied to this app
         runCatching {

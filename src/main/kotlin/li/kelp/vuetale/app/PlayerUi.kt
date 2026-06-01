@@ -78,12 +78,19 @@ class PlayerUi internal constructor(
         componentPath: String,
         lifetime: CustomPageLifetime = CustomPageLifetime.CanDismiss,
     ): PlayerUi {
+        logger.info("openPage called for $ownerId with component: $componentPath")
         val pRef = requirePlayerRef()
         val (ref, store, player) = requirePlayerContext()
         CompletableFuture.runAsync {
-            val newPage = VuetaleUIPage(pRef, ownerId, AppType.Page, lifetime, componentPath)
-            page = newPage
-            player.pageManager.openCustomPage(ref, store, newPage)
+            try {
+                logger.info("openPage async start for $ownerId")
+                val newPage = VuetaleUIPage(pRef, ownerId, AppType.Page, lifetime, componentPath)
+                page = newPage
+                player.pageManager.openCustomPage(ref, store, newPage)
+                logger.info("openPage async complete for $ownerId")
+            } catch (t: Throwable) {
+                logger.severe("openPage async failed for $ownerId: ${t.javaClass.simpleName}: ${t.message}\n${t.stackTraceToString()}")
+            }
         }
         return this
     }
@@ -107,20 +114,26 @@ class PlayerUi internal constructor(
      * whatever server-side mechanism you use to navigate the player away from the page.
      */
     fun closePage() {
-        page?.app?.let { app ->
-            if (app.isMounted) app.unmount()
-        }
+        val appToUnmount = page?.app
+        val pRef = playerRef
 
-        playerRef?.let { ref ->
-            ref.worldUuid?.let { worldUuid ->
-                worldUuid.toWorld()?.execute {
-                    val reference = ref.reference!!
-                    reference.store.getComponent(reference, Player.getComponentType())?.let { player ->
-                        player.pageManager.setPage(reference, reference.store, Page.None)
-                    }
+        CompletableFuture.runAsync {
+            appToUnmount?.let { app ->
+                if (app.isMounted) {
+                    app.unmount()
                 }
             }
 
+            pRef?.let { ref ->
+                ref.worldUuid?.let { worldUuid ->
+                    worldUuid.toWorld()?.execute {
+                        val reference = ref.reference!!
+                        reference.store.getComponent(reference, Player.getComponentType())?.let { player ->
+                            player.pageManager.setPage(reference, reference.store, Page.None)
+                        }
+                    }
+                }
+            }
         }
 
         page = null
@@ -136,9 +149,13 @@ class PlayerUi internal constructor(
     fun openHud(componentPath: String): PlayerUi {
         val (ref, store, player) = requirePlayerContext()
         CompletableFuture.runAsync {
-            val newHud = VuetaleUIHud(requirePlayerRef(), ownerId, componentPath)
-            hud = newHud
-            player.hudManager.setCustomHud(requirePlayerRef(), newHud)
+            try {
+                val newHud = VuetaleUIHud(requirePlayerRef(), ownerId, componentPath)
+                hud = newHud
+                player.hudManager.addCustomHud(requirePlayerRef(), newHud)
+            } catch (t: Throwable) {
+                logger.severe("openHud async failed for $ownerId: ${t.javaClass.simpleName}: ${t.message}\n${t.stackTraceToString()}")
+            }
         }
         return this
     }
@@ -154,8 +171,12 @@ class PlayerUi internal constructor(
         val h = hud ?: return
         val (ref, store, player) = requirePlayerContext()
         CompletableFuture.runAsync {
-            h.hide()
-            player.hudManager.resetHud(requirePlayerRef())
+            try {
+                h.hide()
+                player.hudManager.resetHud(requirePlayerRef())
+            } catch (t: Throwable) {
+                logger.severe("closeHud async failed for $ownerId: ${t.javaClass.simpleName}: ${t.message}\n${t.stackTraceToString()}")
+            }
         }
         hud = null
     }
@@ -242,9 +263,15 @@ object PlayerUiManager {
     /** Get an existing [PlayerUi] without creating one. Returns `null` if the player is unknown. */
     fun get(uuid: UUID): PlayerUi? = playerUis[uuid]
 
-    /** Remove a player's [PlayerUi] entry (call on logout / session end). */
+    /**
+     * Remove a player's [PlayerUi] entry, unmounting any active UI.
+     * Call on logout / session end.
+     */
     fun remove(uuid: UUID) {
-        playerUis.remove(uuid)
+        playerUis.remove(uuid)?.let { ui ->
+            ui.closePage()
+            ui.closeHud()
+        }
     }
 
     // ── Convenience shortcuts ──────────────────────────────────────────────

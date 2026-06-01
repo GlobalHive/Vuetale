@@ -13,11 +13,14 @@ import li.kelp.vuetale.app.App
 import li.kelp.vuetale.app.AppManager
 import li.kelp.vuetale.app.AppType
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType
+import li.kelp.vuetale.app.PlayerUiManager
 import li.kelp.vuetale.javascript.DebugConfig
 import li.kelp.vuetale.javascript.JSEngine
 import li.kelp.vuetale.property.*
 import li.kelp.vuetale.tree.Element
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.locks.ReentrantLock
 import java.util.logging.Logger
 
 /**
@@ -66,15 +69,28 @@ class VuetaleUIPage(
     @Volatile
     private var isActive = true
 
+    private val buildLock = ReentrantLock()
+
     /** The Vuetale app that owns the element tree for this page. */
     val app: App = run {
         val existingApp = AppManager.getApp(AppManager.getAppId(appOwner, appType))
 
         if (existingApp != null) {
+            // Claim ownership BEFORE silencing the dirty callback so that any concurrent
+            // onDismiss on the old VuetaleUIPage sees the new owner and skips removeApp.
+            existingApp.currentOwner = this
+
             // Silence the dirty callback so the V8 tick doesn't fire onDirty while
             // we're in the middle of re-opening the page (deadlock risk, see below).
             existingApp.onDirty = null
             existingApp.isDirty = false
+
+            // If the app is still mounted (old page hasn't been dismissed yet), unmount
+            // it now so that build() can call mount() cleanly.  Without this, Vue warns
+            // "App has already been mounted" and the new page renders nothing.
+            if (existingApp.isMounted) {
+                existingApp.unmount()
+            }
 
             // If a new component path was requested, navigate the live Vue app to it
             // instead of tearing down and recreating everything.
@@ -87,7 +103,7 @@ class VuetaleUIPage(
             // No existing app – create a fresh one.
             // Note: we intentionally do NOT call removeApp here; if somehow a stale
             // entry existed it would have been caught by the branch above.
-            AppManager.createApp(appOwner, appType, componentPath)
+            AppManager.createApp(appOwner, appType, componentPath).also { it.currentOwner = this }
         }
     }
 
@@ -99,97 +115,102 @@ class VuetaleUIPage(
         uiEventBuilder: UIEventBuilder,
         store: Store<EntityStore>
     ) {
-        // 1. Mount Vue – synchronously populates the Kotlin element tree
-        app.mount()
+        buildLock.lock()
+        try {
+            // 1. Mount Vue – synchronously populates the Kotlin element tree
+            app.mount()
 
-        // 2. Load the static root layout (defines group #App {})
-        uiCommandBuilder.append("Common.ui")
-        uiCommandBuilder.append("Pages/HytaleRoot.ui")
+            // 2. Load the static root layout (defines group #App {})
+            uiCommandBuilder.append("Common.ui")
+            uiCommandBuilder.append("Pages/HytaleRoot.ui")
 
-        // 3. Inject the entire rendered tree into #App
-        val rendered = app.root.render(0) // strip newlines to avoid Hytale parser issues
-        uiCommandBuilder.appendInline("#App", rendered)
-        if (DebugConfig.enabled) logger.info ("[vuetaledebug] Initial render:\n$rendered")
+            // 3. Inject the entire rendered tree into #App
+            val rendered = app.root.render(0) // strip newlines to avoid Hytale parser issues
+            uiCommandBuilder.appendInline("#App", rendered)
+            if (DebugConfig.enabled) logger.info("[vuetaledebug] Initial render:\n$rendered")
 
-        // 4. Register all Vue event bindings collected during mount
-        registerEventBindings(uiEventBuilder)
+            // 4. Register all Vue event bindings collected during mount
+            registerEventBindings(uiEventBuilder)
 
-        // Clear stale mount-time tracking: all inserts/patches during mount are already
-        // covered by the appendInline above.  If we leave these lists populated, the first
-        // onDirty invocation would re-process mount-time data and emit bogus structural
-        // commands referencing element IDs that may no longer exist in the client's UI.
-        app.hasStructuralChanges = false
-        app.dirtyElementIds.clear()
-        app.removedElementSelectors.clear()
-        app.insertedElements.clear()
-        app.isDirty = false
-
-        // 5. Wire up the dirty → incremental-update pipeline.
-        //    This lambda runs on the vuetale-v8 thread.
-        //
-        //    IMPORTANT: sendUpdate() must NEVER be called directly on the V8 thread.
-        //    If sendUpdate() blocks (acquiring a Hytale player/page lock) and at the
-        //    same time a second openCustomPage call on the game thread is waiting for
-        //    the V8 thread via evalScript(), the two threads deadlock permanently.
-        //    Dispatching via CompletableFuture.runAsync() keeps the V8 tick non-blocking.
-        app.onDirty = {
-            val structuralChange = app.hasStructuralChanges
-            val dirtyIds = app.dirtyElementIds.toSet()
-            val removedSelectors = app.removedElementSelectors.toList()
-            val insertedElements = app.insertedElements.toList()
-
-            // Reset tracking state before building the update so any mutations that
-            // fire during sendUpdate are captured for the *next* batch.
+            // Clear stale mount-time tracking: all inserts/patches during mount are already
+            // covered by the appendInline above.  If we leave these lists populated, the first
+            // onDirty invocation would re-process mount-time data and emit bogus structural
+            // commands referencing element IDs that may no longer exist in the client's UI.
             app.hasStructuralChanges = false
             app.dirtyElementIds.clear()
             app.removedElementSelectors.clear()
             app.insertedElements.clear()
+            app.isDirty = false
 
-            val hasElementStructural = removedSelectors.isNotEmpty() || insertedElements.isNotEmpty()
+            // 5. Wire up the dirty → incremental-update pipeline.
+            //    This lambda runs on the vuetale-v8 thread.
+            //
+            //    IMPORTANT: sendUpdate() must NEVER be called directly on the V8 thread.
+            //    If sendUpdate() blocks (acquiring a Hytale player/page lock) and at the
+            //    same time a second openCustomPage call on the game thread is waiting for
+            //    the V8 thread via evalScript(), the two threads deadlock permanently.
+            //    Dispatching via CompletableFuture.runAsync() keeps the V8 tick non-blocking.
+            app.onDirty = {
+                val structuralChange = app.hasStructuralChanges
+                val dirtyIds = app.dirtyElementIds.toSet()
+                val removedSelectors = app.removedElementSelectors.toList()
+                val insertedElements = app.insertedElements.toList()
 
-            if (structuralChange || hasElementStructural) {
-                // ── Full re-render ─────────────────────────────────────────
-                // Targeted remove/insert is avoided because stale selectors
-                // (e.g. after ErrorBoundary transitions) cause "element not found"
-                // client disconnects.  A full clear+re-render is always safe.
-                val cmdBuilder = UICommandBuilder()
-                    .clear("#App")
-                    .appendInline("#App", app.root.render(0))
+                // Reset tracking state before building the update so any mutations that
+                // fire during sendUpdate are captured for the *next* batch.
+                app.hasStructuralChanges = false
+                app.dirtyElementIds.clear()
+                app.removedElementSelectors.clear()
+                app.insertedElements.clear()
 
-                val evtBuilder = UIEventBuilder()
-                registerEventBindings(evtBuilder)
-                sendUpdateAsync(cmdBuilder, evtBuilder, false)
-            } else if (dirtyIds.isNotEmpty()) {
-                // ── Incremental property update ────────────────────────────
-                val cmdBuilder = UICommandBuilder()
-                var needsFallback = false
+                val hasElementStructural = removedSelectors.isNotEmpty() || insertedElements.isNotEmpty()
 
-                for (rawId in dirtyIds) {
-                    val element = Element.idElementMap[rawId]
-                    if (element == null) {
-                        continue
-                    }
-                    val selector = element.buildUniqueSelector()
-                    for (prop in element.properties.values) {
-                        if (!emitPropertySet(cmdBuilder, selector, prop)) {
-                            needsFallback = true
-                            break
-                        }
-                    }
-                    if (needsFallback) break
-                }
-
-                if (needsFallback) {
-                    val cmdBuilder2 = UICommandBuilder()
+                if (structuralChange || hasElementStructural) {
+                    // ── Full re-render ─────────────────────────────────────────
+                    // Targeted remove/insert is avoided because stale selectors
+                    // (e.g. after ErrorBoundary transitions) cause "element not found"
+                    // client disconnects.  A full clear+re-render is always safe.
+                    val cmdBuilder = UICommandBuilder()
                         .clear("#App")
                         .appendInline("#App", app.root.render(0))
+
                     val evtBuilder = UIEventBuilder()
                     registerEventBindings(evtBuilder)
-                    sendUpdateAsync(cmdBuilder2, evtBuilder, false)
-                } else {
-                    sendUpdateAsync(cmdBuilder)
+                    sendUpdateAsync(cmdBuilder, evtBuilder, false)
+                } else if (dirtyIds.isNotEmpty()) {
+                    // ── Incremental property update ────────────────────────────
+                    val cmdBuilder = UICommandBuilder()
+                    var needsFallback = false
+
+                    for (rawId in dirtyIds) {
+                        val element = Element.idElementMap[rawId]
+                        if (element == null) {
+                            continue
+                        }
+                        val selector = element.buildUniqueSelector()
+                        for (prop in element.properties.values) {
+                            if (!emitPropertySet(cmdBuilder, selector, prop)) {
+                                needsFallback = true
+                                break
+                            }
+                        }
+                        if (needsFallback) break
+                    }
+
+                    if (needsFallback) {
+                        val cmdBuilder2 = UICommandBuilder()
+                            .clear("#App")
+                            .appendInline("#App", app.root.render(0))
+                        val evtBuilder = UIEventBuilder()
+                        registerEventBindings(evtBuilder)
+                        sendUpdateAsync(cmdBuilder2, evtBuilder, false)
+                    } else {
+                        sendUpdateAsync(cmdBuilder)
+                    }
                 }
             }
+        } finally {
+            buildLock.unlock()
         }
     }
 
@@ -205,7 +226,7 @@ class VuetaleUIPage(
      * forever.  Dispatching here keeps the V8 tick non-blocking.
      */
     private fun sendUpdateAsync(cmdBuilder: UICommandBuilder, evtBuilder: UIEventBuilder, lockInterface: Boolean) {
-        if (DebugConfig.enabled) logger.info ("[vuetaledebug] Update render:\n${app.root.render(0)}")
+        if (DebugConfig.enabled) logger.info("[vuetaledebug] Update render:\n${app.root.render(0)}")
 
         CompletableFuture.runAsync {
             if (isActive) runCatching { sendUpdate(cmdBuilder, evtBuilder, lockInterface) }
@@ -213,7 +234,7 @@ class VuetaleUIPage(
     }
 
     private fun sendUpdateAsync(cmdBuilder: UICommandBuilder) {
-        if (DebugConfig.enabled) logger.info ("[vuetaledebug] Update render:\n${app.root.render(0)}")
+        if (DebugConfig.enabled) logger.info("[vuetaledebug] Update render:\n${app.root.render(0)}")
 
         CompletableFuture.runAsync {
             if (isActive) runCatching { sendUpdate(cmdBuilder, false) }
@@ -296,13 +317,13 @@ class VuetaleUIPage(
             else -> false  // unknown type – trigger fallback
         }
 
-        if (DebugConfig.enabled) logger.info (
-                "[vuetaledebug] Changing property ${prop.name} of $elementSelector to ${prop.toString()}, Render:\n${
-                    app.root.render(
-                        0
-                    )
-                }"
+        if (DebugConfig.enabled) logger.info(
+            "[vuetaledebug] Changing property ${prop.name} of $elementSelector to ${prop.toString()}, Render:\n${
+                app.root.render(
+                    0
                 )
+            }"
+        )
 
         return ret
     }
@@ -329,14 +350,14 @@ class VuetaleUIPage(
         val value = data.value
 
         try {
-            JSEngine.instance.runOnV8Thread {
+            JSEngine.instance.submitToV8Thread {
                 // Re-fetch the binding *inside* the V8 task so we always use the live reference.
                 // If a hot-reload fired in the meantime, forceReset() will have cleared the
                 // registry and this returns null – skipping callVoid before touching the closed runtime.
                 val liveBinding = app.eventRegistry.findByRoutingKey(routingKey)
                 if (liveBinding == null) {
                     logger.warning("No binding found for routingKey='$routingKey' (may be stale after hot-reload)")
-                    return@runOnV8Thread
+                    return@submitToV8Thread
                 }
                 runCatching {
                     liveBinding.callback.callVoid(null, value)
@@ -356,26 +377,48 @@ class VuetaleUIPage(
         }
 
         // Acknowledge the event so Hytale does not consider the page stale
-        sendUpdate()
+        runCatching { sendUpdate() }
     }
 
     // ── onDismiss ──────────────────────────────────────────────────────────
 
-    override fun onDismiss(ref: Ref<EntityStore>, store: Store<EntityStore>) {
-        // Prevent any in-flight async sendUpdate from reaching a dismissed page.
+    internal fun prepareForDismissal() {
+        logger.info("[VuetaleUIPage] prepareForDismissal: called for page ${app.getId()}")
         isActive = false
-        // Detach the dirty callback first to avoid any stray update after unmount
         app.onDirty = null
+        //app.isDirty = false
+        // Keep ESC dismissal lock-safe: cancel app-owned timers without running full Vue unmount.
+        //JSEngine.instance.evalScriptAsync("try { _vt.cancelTimersForApp('${app.getId()}'); } catch(e) {}")
+    }
 
-        // Only remove this specific App instance.  If the user opened the page a
-        // second time before dismissing the first, the constructor will have already
-        // replaced this app in AppManager with a new one.  Calling removeApp by
-        // owner+type would then unmount the *new* app, killing the second session.
-        if (AppManager.getApp(app.getId()) === app) {
-            AppManager.removeApp(app.owner, app.type)
+
+    override fun onDismiss(ref: Ref<EntityStore>, store: Store<EntityStore>) {
+        prepareForDismissal()
+        buildLock.lock()
+        try {
+
+            // Only remove this App if we are still its current owner.  When openPage is
+            // called while a page is already open, the new VuetaleUIPage reuses the same
+            // App object and claims ownership before openCustomPage is called.  If this
+            // onDismiss fires *after* the new page claimed ownership (currentOwner !== this),
+            // we must NOT remove/unmount the app – it now belongs to the new page.
+            if (app.currentOwner === this) {
+                // Explicitly call closePage on the PlayerUi to ensure cleanup.
+                // This was the missing piece. AppManager.removeApp is not enough.
+                try {
+                    val playerUuid = UUID.fromString(app.owner)
+                    PlayerUiManager.get(playerUuid)?.closePage()
+                } catch (e: IllegalArgumentException) {
+                    // app.owner might not be a UUID, handle gracefully
+                    logger.warning("Could not parse UUID from app owner '${app.owner}' during onDismiss")
+                }
+                app.forceReset()
+                AppManager.removeApp(app.owner, app.type, unmount = false)
+            }
+
+            super.onDismiss(ref, store)
+        } finally {
+            buildLock.unlock()
         }
-
-        super.onDismiss(ref, store)
     }
 }
-
