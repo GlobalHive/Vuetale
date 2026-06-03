@@ -91,19 +91,24 @@ class PlayerUi internal constructor(
         }
 
     // Buffers for setData/setHudData calls that arrive before the page/hud app is created.
+    private val dataLock = Any()
     private val pendingPageData: MutableMap<String, Any?> = LinkedHashMap()
     private val pendingHudData: MutableMap<String, Any?> = LinkedHashMap()
 
     private fun flushPendingPageData(app: App) {
-        if (pendingPageData.isEmpty()) return
-        pendingPageData.forEach { (k, v) -> app.setData(k, v) }
-        pendingPageData.clear()
+        val pendingEntries = synchronized(dataLock) {
+            if (pendingPageData.isEmpty()) return
+            pendingPageData.entries.map { it.key to it.value }.also { pendingPageData.clear() }
+        }
+        pendingEntries.forEach { (k, v) -> app.setData(k, v) }
     }
 
     private fun flushPendingHudData(app: App) {
-        if (pendingHudData.isEmpty()) return
-        pendingHudData.forEach { (k, v) -> app.setData(k, v) }
-        pendingHudData.clear()
+        val pendingEntries = synchronized(dataLock) {
+            if (pendingHudData.isEmpty()) return
+            pendingHudData.entries.map { it.key to it.value }.also { pendingHudData.clear() }
+        }
+        pendingEntries.forEach { (k, v) -> app.setData(k, v) }
     }
 
     // ── Page API ───────────────────────────────────────────────────────────
@@ -260,12 +265,14 @@ class PlayerUi internal constructor(
      * @param value Any JSON-serialisable JVM value (String, Number, Boolean, data class, null).
      */
     fun setData(key: String, value: Any?) {
-        val app = page?.app
-        if (app != null) {
-            app.setData(key, value)
-        } else {
-            pendingPageData[key] = value
+        val app = synchronized(dataLock) {
+            val currentApp = page?.app
+            if (currentApp == null) {
+                pendingPageData[key] = value
+            }
+            currentApp
         }
+        app?.setData(key, value)
     }
 
     /**
@@ -273,12 +280,14 @@ class PlayerUi internal constructor(
      * Buffered if the HUD is not yet active.
      */
     fun setHudData(key: String, value: Any?) {
-        val app = hud?.app
-        if (app != null) {
-            app.setData(key, value)
-        } else {
-            pendingHudData[key] = value
+        val app = synchronized(dataLock) {
+            val currentApp = hud?.app
+            if (currentApp == null) {
+                pendingHudData[key] = value
+            }
+            currentApp
         }
+        app?.setData(key, value)
     }
 
     // ── Internal ───────────────────────────────────────────────────────────
