@@ -280,6 +280,9 @@ class App(val owner: String, val type: AppType, var componentPath: String? = nul
                 }
                 result.close()
             }
+            // removeUserApp() clears USER_APPS_REF; recreate the JS container ref
+            // before mount so Vue never receives an undefined mount target.
+            updateReference()
             needsJsRecreation = false
         }
 
