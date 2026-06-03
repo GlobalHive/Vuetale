@@ -301,6 +301,11 @@ class PlayerUi internal constructor(
     }
 
     private fun startPendingOpenLocked(reason: String) {
+        if (!isWorldThread()) {
+            dispatchPendingOpenToWorldThread(reason)
+            return
+        }
+
         closeBarrier?.let { barrier ->
             if (!barrier.isDone) {
                 logUi("Open deferred until close barrier completes", uiId = pageUiId(), extra = " reason=$reason")
@@ -321,9 +326,6 @@ class PlayerUi internal constructor(
             PageOpenSnapshot(ctx.ref, ctx.store)
         } catch (t: Throwable) {
             logger.severe("[UI] Pre-open world-thread snapshot failed uiId=${pageUiId()} player=$uuid state=${lifecycle.currentState()} thread=${Thread.currentThread().name} ts=${Instant.now()} error=${t.javaClass.simpleName}:${t.message}")
-            lifecycle.transition(UiLifecycleState.CLOSING, "pre-open-snapshot-failed")
-            lifecycle.transition(UiLifecycleState.DESTROYED, "pre-open-snapshot-failed")
-            lifecycle.transition(UiLifecycleState.CLOSED, "pre-open-snapshot-failed-reset")
             return
         }
 
@@ -542,6 +544,23 @@ class PlayerUi internal constructor(
         logger.info(
             "[UI] $event player=$uuid uiId=${uiId ?: "-"} state=${lifecycle.currentState()} thread=${Thread.currentThread().name} ts=${Instant.now()}$extra"
         )
+    }
+
+    private fun isWorldThread(): Boolean = Thread.currentThread().name.contains("WorldThread")
+
+    private fun dispatchPendingOpenToWorldThread(reason: String) {
+        val world = playerRef?.worldUuid?.toWorld()
+        if (world == null) {
+            logUi("Cannot dispatch pending open to WorldThread (world unavailable)", uiId = pageUiId(), extra = " reason=$reason")
+            return
+        }
+
+        logUi("Dispatching pending open to WorldThread", uiId = pageUiId(), extra = " reason=$reason")
+        world.execute {
+            synchronized(lifecycleLock) {
+                startPendingOpenLocked("world-dispatch:$reason")
+            }
+        }
     }
 
     private fun pageUiId(): String = "$ownerId-${AppType.Page}"
